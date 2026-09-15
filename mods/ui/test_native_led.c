@@ -1,0 +1,44 @@
+#ifdef NDEBUG
+#error LED acceptance requires assertions
+#endif
+#include "native_led.h"
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+static unsigned calls;
+static int color(int deck,int pad,uint32_t *rgb,int *enabled) {
+ assert(deck==0);assert(pad>=0&&pad<4);calls++;
+ if(pad==3)return 0;
+ *rgb=0x123456;*enabled=pad!=1;return 1;
+}
+static void put(unsigned char *p,uint32_t v) {memcpy(p,&v,4);}
+static uint32_t word(const unsigned char *p) {uint32_t v;memcpy(&v,p,4);return v;}
+int main(void) {
+ unsigned char packet[8*XZ_LED_RECORD_BYTES],saved[sizeof(packet)];
+ memset(packet,0,sizeof(packet));
+ for(unsigned i=0;i<8;i++) {
+  unsigned char *p=packet+i*XZ_LED_RECORD_BYTES;
+  put(p,0x12+i);put(p+4,1);put(p+0x10,2);put(p+0x14,1);
+  put(p+0x1c,500);p[0x28]=0xee;
+ }
+ /* C is stock-forced and D unclaimed; E-H and channel2 must stay native. */
+ packet[2*XZ_LED_RECORD_BYTES+0x18]=1;
+ memcpy(saved,packet,sizeof(packet));
+ assert(xz_native_led_apply(packet,sizeof(packet),8,1,color)==2&&calls==3);
+ assert(word(packet+0x10)==1&&word(packet+0x14)==1&&word(packet+0x1c)==0);
+ assert(packet[0x28]==0x12&&packet[0x29]==0x34&&packet[0x2a]==0x56&&!packet[0x18]);
+ assert(word(packet+XZ_LED_RECORD_BYTES+0x10)==1);
+ assert(packet[XZ_LED_RECORD_BYTES+0x28]==2&&packet[XZ_LED_RECORD_BYTES+0x29]==6&&packet[XZ_LED_RECORD_BYTES+0x2a]==10);
+ assert(!memcmp(packet+2*XZ_LED_RECORD_BYTES,saved+2*XZ_LED_RECORD_BYTES,6*XZ_LED_RECORD_BYTES));
+ memcpy(packet,saved,sizeof(packet));calls=0;
+ assert(!xz_native_led_apply(packet,sizeof(packet),8,2,color)&&!calls);
+ assert(!memcmp(packet,saved,sizeof(packet)));
+ assert(!xz_native_led_apply(packet,sizeof(packet)-1,8,1,color));
+ assert(!xz_native_led_apply(packet,sizeof(packet),257,1,color));
+ assert(!xz_native_led_apply(packet,sizeof(packet),8,0,color));
+ assert(!xz_native_led_apply(NULL,sizeof(packet),8,1,color));
+ assert(!xz_native_led_apply(packet,sizeof(packet),8,1,NULL));
+ assert(!memcmp(packet,saved,sizeof(packet)));
+ puts("PASS native LED packet bounds, colors, mute, stock ownership and channel isolation");
+}

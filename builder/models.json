@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "sample_rate": 44100,
+  "channels": 2,
+  "max_combined_pcm_bytes": 134217728,
+  "pipeline_version": "xz-stereo44100-residual-s16-v1",
+  "trust_boundary": "Packaged manifest and managed Python environment are trusted. Verify all artifact bytes before deserialization; Smule source is compiled from verified bytes, not imported from its directory. No downloads or installation occur in this adapter. Model directory must remain read-only during inference.",
+  "presets": {
+    "umxhq": {
+      "title": "Open-Unmix UMX-HQ",
+      "umx_targets": [
+        "vocals",
+        "drums",
+        "bass",
+        "other"
+      ],
+      "umx_residual": false,
+      "models": [
+        "bass-8d85a5bd.pth",
+        "drums-9619578f.pth",
+        "vocals-b62c91ce.pth",
+        "other-b52fbbf7.pth"
+      ],
+      "vocals": "umxhq",
+      "drums": "umxhq",
+      "harmonics": "mix-vocals-drums",
+      "umx_chunk_frames": 352800,
+      "umx_hop_frames": 176400,
+      "niter": 1,
+      "wiener_win_len": 300,
+      "runtime_validation_verified": false
+    },
+    "vocal-focus": {
+      "title": "Smule Windowed RoFormer + UMX-HQ drums",
+      "umx_targets": [
+        "drums"
+      ],
+      "umx_residual": true,
+      "models": [
+        "drums-9619578f.pth",
+        "mbr-win10-sink8.ckpt"
+      ],
+      "vocals": "smule-windowed-roformer",
+      "drums": "umxhq",
+      "harmonics": "mix-vocals-drums",
+      "umx_chunk_frames": 352800,
+      "umx_hop_frames": 176400,
+      "smule_chunk_seconds": 8,
+      "smule_batch_size": 1,
+      "niter": 1,
+      "wiener_win_len": 300,
+      "runtime_validation_verified": false
+    }
+  },
+  "models": {
+    "bass-8d85a5bd.pth": {
+      "filename": "bass-8d85a5bd.pth",
+      "url": "https://zenodo.org/records/3370489/files/bass-8d85a5bd.pth",
+      "sha256": "8d85a5bd3f996a8867fca0e8442e077e5a3f5ec747a6112742452a8f347b39c8",
+      "bytes": 35637796,
+      "license": "umxhq-mit"
+    },
+    "drums-9619578f.pth": {
+      "filename": "drums-9619578f.pth",
+      "url": "https://zenodo.org/records/3370489/files/drums-9619578f.pth",
+      "sha256": "9619578f885c54737cb0234f9f9a4a679ee4f31438fd77fd1dbe02bb16c2da0a",
+      "bytes": 35637796,
+      "license": "umxhq-mit"
+    },
+    "vocals-b62c91ce.pth": {
+      "filename": "vocals-b62c91ce.pth",
+      "url": "https://zenodo.org/records/3370489/files/vocals-b62c91ce.pth",
+      "sha256": "b62c91cedbc7a066f1778ead5b5cecb377aa3a46a31af1cce7c5c8769339d083",
+      "bytes": 35637796,
+      "license": "umxhq-mit"
+    },
+    "other-b52fbbf7.pth": {
+      "filename": "other-b52fbbf7.pth",
+      "url": "https://zenodo.org/records/3370489/files/other-b52fbbf7.pth",
+      "sha256": "b52fbbf76479e752bd72e02304c602ac7802aa5bfbfb9cd12054b2695d5093ab",
+      "bytes": 35637796,
+      "license": "umxhq-mit"
+    },
+    "mbr-win10-sink8.ckpt": {
+      "filename": "mbr-win10-sink8.ckpt",
+      "url": "https://huggingface.co/smulelabs/windowed-roformer/resolve/d9642ed592120dca935ebb783c77f2faa1e6c32b/mbr-win10-sink8.ckpt",
+      "sha256": "7afe79947745faf8cddd650afc822aa7c387882047e65fe65f136f539365a656",
+      "bytes": 913837877,
+      "license": "smule-mit"
+    }
+  },
+  "smule_code": {
+    "commit": "cc43c280518ee5ebab7826d8efe3b5a342df8857",
+    "files": {
+      "main.py": {
+        "filename": "main.py",
+        "url": "https://raw.githubusercontent.com/smulelabs/windowed-roformer/cc43c280518ee5ebab7826d8efe3b5a342df8857/main.py",
+        "sha256": "49cf17862ca45e3089ea66b915b6d9d7488550a80c3bd9b3e81e7889e15e6a86",
+        "bytes": 4614
+      },
+      "model.py": {
+        "filename": "model.py",
+        "url": "https://raw.githubusercontent.com/smulelabs/windowed-roformer/cc43c280518ee5ebab7826d8efe3b5a342df8857/model.py",
+        "sha256": "391f188e8f071aeeabd33d5881b8a955091d49488066811ee4ab434f8e09d7e3",
+        "bytes": 12930
+      },
+      "modules.py": {
+        "filename": "modules.py",
+        "url": "https://raw.githubusercontent.com/smulelabs/windowed-roformer/cc43c280518ee5ebab7826d8efe3b5a342df8857/modules.py",
+        "sha256": "5aecf4732ebceb204684b0162a5bdecb79876b48ab8cc221d92932503cc696c6",
+        "bytes": 10685
+      },
+      "flex_attention_utils.py": {
+        "filename": "flex_attention_utils.py",
+        "url": "https://raw.githubusercontent.com/smulelabs/windowed-roformer/cc43c280518ee5ebab7826d8efe3b5a342df8857/flex_attention_utils.py",
+        "sha256": "ac7a3f54c790eb24bc2c1baf4efd953f22393d119eaa81cddc9096895cccb875",
+        "bytes": 3254
+      }
+    },
+    "archive": {
+      "filename": "windowed-roformer-cc43c280518ee5ebab7826d8efe3b5a342df8857.zip",
+      "url": "https://codeload.github.com/smulelabs/windowed-roformer/zip/cc43c280518ee5ebab7826d8efe3b5a342df8857",
+      "sha256": "ceb27f5ff386ae608d85b98b6ac513f609379160f904cbf3df3c5be62dc106c5",
+      "bytes": 13055
+    }
+  },
+  "runtime_versions": {
+    "torch": "2.8.0",
+    "torchaudio": "2.8.0",
+    "openunmix": "1.3.0"
+  },
+  "vocal_focus_dependencies": {
+    "rotary-embedding-torch": "0.3.5",
+    "einops": "0.8.1",
+    "librosa": "0.11.0",
+    "packaging": "25.0"
+  },
+  "dependency_policy": "These are direct version constraints, not approval of an unresolved wheel graph. Root builder owns the complete tested lock, hashes and third-party notices, including separate GPU vendor terms.",
+  "licenses": {
+    "umxhq-mit": {
+      "spdx": "MIT",
+      "code_url": "https://github.com/sigsep/open-unmix-pytorch/blob/fb672c9584997c2b05e148eeaa65b4c23ed4693b/LICENSE",
+      "weights_evidence_url": "https://zenodo.org/api/records/3370489",
+      "weights_evidence": "Original authors weight deposit metadata.license.id is mit-license. Applies to UMX-HQ, not UMXL.",
+      "text": "MIT License\n\nCopyright (c) 2019 Inria (Fabian-Robert St\u00f6ter, Antoine Liutkus)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+    },
+    "smule-mit": {
+      "spdx": "MIT",
+      "code_url": "https://github.com/smulelabs/windowed-roformer/blob/cc43c280518ee5ebab7826d8efe3b5a342df8857/LICENSE",
+      "weights_evidence_url": "https://arxiv.org/html/2510.25745v1",
+      "model_card_url": "https://huggingface.co/smulelabs/windowed-roformer/blob/d9642ed592120dca935ebb783c77f2faa1e6c32b/README.md",
+      "weights_evidence": "Original authors explicitly release their code and checkpoints under MIT; author-owned model card also states MIT.",
+      "text": "MIT License\n\nCopyright (c) 2025 Smule Labs\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+    }
+  },
+  "python": ">=3.11,<3.14"
+}

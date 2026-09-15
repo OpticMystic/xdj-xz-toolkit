@@ -1,0 +1,2 @@
+cryptography>=42,<47
+pycdlib>=1.14,<2

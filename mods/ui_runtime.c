@@ -1,0 +1,336 @@
+#define _GNU_SOURCE
+#include "ui_runtime.h"
+#include "runtime.h"
+#include "audio/runtime.h"
+#include "key/runtime.h"
+#include "ui/native_touch.h"
+#include "ui/stem_pads.h"
+#include "ui/native_led.h"
+#include "settings.h"
+#include "../vendor/tools/xz_runtime/mods_bridge.h"
+#include <dlfcn.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+
+static pthread_mutex_t ui_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct xz_ui ui;
+static struct xz_ui_model model;
+static struct xz_native_touch touch;
+static struct xz_audio_status audio_status[2];
+static xz_stock_touch stock_touch;
+static void (*forward_touch)(int, int, int);
+static int started, visible, audio_available, key_available, forwarded_down;
+static char device_ip[16];
+static struct xz_stem_pads pads;
+static unsigned touch_muted[2];
+static int deck_page[2] = {-1,-1};
+static unsigned sync_down, sync_owned;
+static pthread_cond_t settings_changed = PTHREAD_COND_INITIALIZER;
+static pthread_t settings_thread;
+static int settings_running, settings_pending;
+static int requested_stems;
+static char settings_usb[1024];
+static struct stat settings_volume;
+
+static struct xz_settings settings_snapshot(void) {
+    return (struct xz_settings){requested_stems,
+        !!(model.enabled & XZ_UI_GATE), !!(model.enabled & XZ_UI_SMART), model.theme,
+        model.stem_page, model.shift_pages, model.pad_feedback, model.shift_keysync};
+}
+static void settings_queue(void) {
+    if (!settings_running) { model.settings_status = "SETTINGS NOT SAVED: START FROM USB"; return; }
+    model.settings_status = "SAVING SETTINGS TO USB";
+    settings_pending = 1; pthread_cond_signal(&settings_changed);
+}
+static void *settings_writer(void *unused) {
+    (void)unused;
+    pthread_mutex_lock(&ui_mutex);
+    while (settings_running || settings_pending) {
+        while (settings_running && !settings_pending) pthread_cond_wait(&settings_changed,&ui_mutex);
+        if (!settings_running && !settings_pending) break;
+        struct xz_settings saved = settings_snapshot();
+        settings_pending = 0;
+        pthread_mutex_unlock(&ui_mutex);
+        struct stat current;
+        int same_volume = !stat(settings_usb,&current) && current.st_dev == settings_volume.st_dev && current.st_ino == settings_volume.st_ino;
+        int rc = same_volume ? xz_settings_save(settings_usb,&saved) : -1;
+        pthread_mutex_lock(&ui_mutex);
+        if (!settings_pending) model.settings_status = rc ? "SETTINGS NOT SAVED: CHECK USB" : "SETTINGS SAVED TO USB";
+    }
+    pthread_mutex_unlock(&ui_mutex); return NULL;
+}
+
+static void levels(int deck) {
+    if (deck < 0 || deck > 1) return;
+    struct xz_ui_deck *d = &model.deck[deck];
+    struct xz_stem_levels value = {1, 1, 1};
+    if (!d->bypass) {
+        value.drums = d->muted & 1 ? 0 : d->levels[0];
+        value.harmonics = d->muted & 2 ? 0 : d->levels[1];
+        value.vocals = d->muted & 4 ? 0 : d->levels[2];
+    }
+    xz_audio_set_levels(deck, value);
+}
+
+static void apply(void *context, const struct xz_ui_action *actions, size_t count) {
+    (void)context;
+    for (size_t i = 0; i < count; i++) {
+        const struct xz_ui_action *a = &actions[i];
+        switch (a->kind) {
+        case XZ_UI_CLOSE:
+            xz_native_touch_visible(&touch, 0);
+            __atomic_store_n(&visible, 0, __ATOMIC_RELEASE);
+            break;
+        case XZ_UI_ENABLE:
+            if (a->index == XZ_UI_GATE || a->index == XZ_UI_SMART ||
+                (a->index == XZ_UI_STEM && audio_available)) {
+                uint32_t next = a->value != 0 ? model.enabled | (uint32_t)a->index : model.enabled & ~(uint32_t)a->index;
+                if (a->index == XZ_UI_STEM) {
+                    requested_stems = a->value != 0;
+                    xz_audio_set_enabled(a->value != 0); model.enabled = next;
+                    if (a->value != 0) { levels(0); levels(1); }
+                }
+                else if (xz_runtime_set_cues(!!(next & XZ_UI_GATE), !!(next & XZ_UI_SMART)) == 0) model.enabled = next;
+            }
+            break;
+        case XZ_UI_LEVEL:
+            if (a->deck >= 0 && a->deck < 2 && a->index >= 0 && a->index < 3) {
+                model.deck[a->deck].levels[a->index] = a->value; levels(a->deck);
+            }
+            break;
+        case XZ_UI_MUTE:
+            if (a->deck >= 0 && a->deck < 2 && a->index >= 0 && a->index < 3) {
+                if (a->phase == XZ_UI_RELEASE) touch_muted[a->deck] &= ~(1u << a->index);
+                else touch_muted[a->deck] |= 1u << a->index;
+                model.deck[a->deck].muted = touch_muted[a->deck] | pads.muted[a->deck];
+                levels(a->deck);
+            }
+            break;
+        case XZ_UI_BYPASS:
+            if (a->deck >= 0 && a->deck < 2) { model.deck[a->deck].bypass = a->value != 0; levels(a->deck); }
+            break;
+        case XZ_UI_SET_THEME:
+            if (a->index >= 0 && a->index <= 6) model.theme = a->index;
+            break;
+        case XZ_UI_STEM_PAGE:
+            if (a->index >= 0 && a->index < 4) model.stem_page = a->index;
+            break;
+        case XZ_UI_SHIFT_PAGES: model.shift_pages = a->value != 0; break;
+        case XZ_UI_PAD_FEEDBACK: model.pad_feedback = a->value != 0; break;
+        case XZ_UI_SHIFT_KEYSYNC: model.shift_keysync = a->value != 0; break;
+        case XZ_UI_KEY_SHIFT:
+            if (key_available && a->deck >= 0 && a->deck < 2) {
+                int current;
+                if (xz_key_get_desired_semitones(a->deck, &current) == 0) {
+                    int target = a->index == 0 ? 0 : current + a->index;
+                    if (xz_key_set_desired_semitones(a->deck, target) != 0)
+                        snprintf(ui.notice, sizeof(ui.notice), "KEY RANGE IS -12 TO +12 SEMITONES");
+                }
+            }
+            break;
+        default:
+            break; /* Unconnected capabilities remain disabled by the model. */
+        }
+        if (a->kind == XZ_UI_ENABLE || a->kind == XZ_UI_SET_THEME ||
+            a->kind == XZ_UI_STEM_PAGE || a->kind == XZ_UI_SHIFT_PAGES ||
+            a->kind == XZ_UI_PAD_FEEDBACK || a->kind == XZ_UI_SHIFT_KEYSYNC) settings_queue();
+    }
+}
+
+static void refresh(void) {
+    for (int deck = 0; deck < 2; deck++) {
+        model.deck[deck].ready = XZ_UI_GATE | XZ_UI_SMART | XZ_UI_THEME;
+        if (key_available) {
+            model.deck[deck].ready |= XZ_UI_KEY;
+            xz_key_get_desired_semitones(deck, &model.deck[deck].key_semitones);
+        }
+        if (audio_available) {
+            model.deck[deck].ready |= XZ_UI_STEM;
+            if (xz_audio_get_status(deck, &audio_status[deck]) == 0) {
+                const char *path = audio_status[deck].path;
+                const char *name = strrchr(path, '/');
+                model.deck[deck].track = path[0] ? (name ? name + 1 : path) : "NO TRACK CAPTURED";
+                model.deck[deck].status = xz_audio_state_name(audio_status[deck].state);
+            }
+        }
+    }
+}
+
+int xz_ui_runtime_pad(const struct xz_cue_event *event,unsigned *trace_flags) {
+    *trace_flags = 0;
+    if (!__atomic_load_n(&started, __ATOMIC_ACQUIRE)) return 0;
+    pthread_mutex_lock(&ui_mutex);
+    if (event->deck >= 0 && event->deck < 2) deck_page[event->deck] = event->pad_page;
+    if (event->sync && event->deck >= 0 && event->deck < 2) {
+        unsigned bit = 1u << event->deck;
+        int owned = !!(sync_owned & bit);
+        if (event->operation == 2 || event->operation == 3) {
+            sync_down &= ~bit; sync_owned &= ~bit;
+        } else if (event->operation == 0 && !(sync_down & bit)) {
+            sync_down |= bit;
+            if (event->shift && model.shift_keysync) {
+                sync_owned |= bit; owned = 1;
+                snprintf(ui.notice,sizeof(ui.notice),"KEY SYNC NOT READY: TRACK KEY / MASTER METADATA REQUIRED");
+            }
+        }
+        pthread_mutex_unlock(&ui_mutex); return owned;
+    }
+    *trace_flags = 1u | (touch.visible ? 2u : 0) | (ui.page == XZ_UI_STEMS ? 4u : 0) |
+        (ui.deck == event->deck ? 8u : 0) | (model.enabled & XZ_UI_STEM ? 16u : 0) |
+        (audio_available ? 32u : 0) | (event->hotcue_mode ? 64u : 0);
+    int toggle;
+    int active = touch.visible && ui.page == XZ_UI_STEMS && ui.deck == event->deck &&
+        audio_available && (model.enabled & XZ_UI_STEM);
+    int consumed = xz_stem_control_event(&pads, event, active, model.stem_page, model.shift_pages, &toggle);
+    if (consumed) *trace_flags |= 128u;
+    if (toggle >= 0) *trace_flags |= 256u;
+    if (toggle >= 0) {
+        int deck = event->deck;
+        model.deck[deck].muted = touch_muted[deck] | pads.muted[deck];
+        if (toggle == 3) model.deck[deck].bypass = !model.deck[deck].bypass;
+        levels(deck);
+    }
+    if (event->deck >= 0 && event->deck < 2) {
+        if (model.deck[event->deck].bypass) *trace_flags |= 512u;
+        *trace_flags |= (model.deck[event->deck].muted & 7u) << 10;
+        if (audio_status[event->deck].state == XZ_AUDIO_EXPERIMENTAL_READY) *trace_flags |= 8192u;
+    }
+    pthread_mutex_unlock(&ui_mutex);
+    return consumed;
+}
+
+int xz_ui_runtime_pad_color(int deck,int pad,unsigned *rgb,int *lit) {
+    if (!__atomic_load_n(&started,__ATOMIC_ACQUIRE) || deck < 0 || deck > 1 || pad < 0 || pad > 3) return 0;
+    if (pthread_mutex_trylock(&ui_mutex)) return 0;
+    int active = touch.visible && ui.page == XZ_UI_STEMS && ui.deck == deck &&
+        audio_available && (model.enabled & XZ_UI_STEM) && model.pad_feedback && deck_page[deck] == model.stem_page;
+    if (active) {
+        *rgb = pad < 3 ? xz_ui_stem_color(model.theme,pad) : 0xffffffu;
+        *lit = pad < 3 ? !(model.deck[deck].muted & (1u << pad)) && !model.deck[deck].bypass : model.deck[deck].bypass;
+    }
+    pthread_mutex_unlock(&ui_mutex); return active;
+}
+void xz_ui_runtime_pad_native_page(int deck,int page) {
+    if (deck < 0 || deck > 1) return;
+    pthread_mutex_lock(&ui_mutex); deck_page[deck] = page; pthread_mutex_unlock(&ui_mutex);
+}
+
+static void touch_hook(void *self, const struct xz_touch_status *status, const void *mode) {
+    if (!__atomic_load_n(&started, __ATOMIC_ACQUIRE)) { stock_touch(self, status, mode); return; }
+    pthread_mutex_lock(&ui_mutex);
+    refresh();
+    int owned = xz_native_touch_dispatch(&touch, self, status, mode, stock_touch);
+    __atomic_store_n(&visible, touch.visible, __ATOMIC_RELEASE);
+    if (owned && forwarded_down && forward_touch) {
+        forward_touch(0, (int)status->x, (int)status->y); forwarded_down = 0;
+    } else if (!owned && forward_touch && !!status->down != forwarded_down) {
+        forwarded_down = !!status->down;
+        forward_touch(forwarded_down, (int)status->x, (int)status->y);
+    }
+    pthread_mutex_unlock(&ui_mutex);
+}
+
+__attribute__((visibility("default"))) int xz_mods_visible_v1(void) {
+    return __atomic_load_n(&visible, __ATOMIC_ACQUIRE);
+}
+
+__attribute__((visibility("default"))) int xz_mods_native_touch_v1(void) {
+    return __atomic_load_n(&started, __ATOMIC_ACQUIRE);
+}
+
+static void badge(uint16_t *pixels, uint32_t stride) {
+    xz_ui_render_badge(pixels,stride);
+}
+
+__attribute__((visibility("default"))) int xz_mods_render_v1(uint16_t *pixels, uint32_t width,
+        uint32_t height, uint32_t stride, const struct xz_vj_connection_v1 *connection) {
+    if (!__atomic_load_n(&started, __ATOMIC_ACQUIRE) || !pixels || width != 800 || height != 480 || stride < 800 || stride > 16384)
+        return 0;
+    if (pthread_mutex_trylock(&ui_mutex) != 0) return 0;
+    refresh();
+    if (connection && connection->version == 1 && connection->size == sizeof(*connection)) {
+        memcpy(device_ip, connection->ipv4, sizeof(device_ip)); device_ip[15] = 0;
+        model.connection.ready = 1;
+        model.connection.enabled = connection->listening != 0;
+        model.connection.connected = connection->connected != 0;
+        model.connection.discoverable = connection->discovery != 0;
+        model.connection.device_ip = device_ip;
+        model.connection.port = 50005;
+        model.connection.protocol = "VJFS / VJVP / VJTE + VJXZ";
+        model.connection.stats_valid = connection->stats_valid != 0;
+        model.connection.frame_hz = connection->frame_hz_milli / 1000.0f;
+        model.connection.status = "CONNECTION SERVICE CONFIGURED BY THE MOD LOADER";
+    }
+    int result;
+    if (touch.visible) result = xz_ui_render(&ui, &model, pixels, (size_t)stride * height, stride);
+    else { badge(pixels, stride); result = 1; }
+    pthread_mutex_unlock(&ui_mutex);
+    return result;
+}
+
+int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
+    static const unsigned char guard[8] = {0xf0,0x45,0x2d,0xe9,0x02,0x70,0xa0,0xe1};
+    if (started) return 0;
+    settings_usb[0] = 0; settings_pending = 0;
+    forward_touch = (void (*)(int,int,int))dlsym(RTLD_DEFAULT, "xz_vj_touch_v1");
+    if (!forward_touch) { xz_log("UI unavailable: receiver does not expose the optional display bridge"); return -1; }
+    audio_available = audio_ready;
+    key_available = key_ready;
+    memset(&model, 0, sizeof(model));
+    model.pad_feedback = 1;
+    requested_stems = !!stems_enabled;
+    model.settings_status = "SETTINGS NOT SAVED: START FROM USB";
+    model.enabled = xz_runtime_cue_flags();
+    if (audio_ready && stems_enabled) model.enabled |= XZ_UI_STEM;
+    const char *usb = getenv("XZ_MODS_USB");
+    if (usb && strlen(usb) < sizeof(settings_usb) && !stat(usb,&settings_volume) && S_ISDIR(settings_volume.st_mode)) {
+        strcpy(settings_usb,usb);
+        struct xz_settings saved;
+        int rc = xz_settings_load(usb,&saved);
+        if (!rc) {
+            requested_stems = saved.stems;
+            model.theme = saved.theme; model.stem_page = saved.stem_page;
+            model.shift_pages = saved.shift_pages; model.pad_feedback = saved.pad_feedback;
+            model.shift_keysync = saved.shift_keysync;
+            xz_runtime_set_cues(saved.gate,saved.smart);
+            model.enabled = xz_runtime_cue_flags();
+            if (audio_ready) { xz_audio_set_enabled(saved.stems); if (saved.stems) model.enabled |= XZ_UI_STEM; }
+        }
+        model.settings_status = rc < 0 ? "INVALID USB SETTINGS: USING DEFAULTS" : rc ? "USB SETTINGS READY" : "SETTINGS RESTORED FROM USB";
+    }
+    for (int i = 0; i < 4; i++) {
+        model.deck[i].groove_active = model.deck[i].sample_active = -1;
+        model.deck[i].levels[0] = model.deck[i].levels[1] = model.deck[i].levels[2] = 1;
+        model.deck[i].sample_volume = 1;
+        model.deck[i].track = i < 2 ? "NO TRACK CAPTURED" : "EXTERNAL USB AUDIO";
+        model.deck[i].status = i < 2 ? "NATIVE ADAPTER EXPERIMENTAL" : "CONTROL IN REKORDBOX OR SERATO";
+    }
+    xz_ui_init(&ui);
+    xz_native_touch_init(&touch, &ui, &model, apply, NULL);
+    refresh();
+    if (xz_hook_arm(0x2628b4, guard, (void *)touch_hook, (void **)&stock_touch) != 0) return -1;
+    if (settings_usb[0]) {
+        settings_running = 1;
+        if (pthread_create(&settings_thread,NULL,settings_writer,NULL)) {
+            settings_running = 0; model.settings_status = "SETTINGS SAVE UNAVAILABLE";
+        }
+    }
+    __atomic_store_n(&started, 1, __ATOMIC_RELEASE);
+    if (xz_native_led_start()) xz_log("Native pad LED feedback unavailable");
+    xz_log("UI touch adapter installed; MODS badge opens the panel");
+    return 0;
+}
+
+void xz_ui_runtime_stop(void) {
+    xz_native_led_stop();
+    __atomic_store_n(&started, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&visible, 0, __ATOMIC_RELEASE);
+    pthread_mutex_lock(&ui_mutex);
+    int join = settings_running;
+    settings_running = 0; pthread_cond_signal(&settings_changed);
+    pthread_mutex_unlock(&ui_mutex);
+    if (join) pthread_join(settings_thread,NULL);
+}

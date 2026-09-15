@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: MIT
+# Source this file, then explicitly call vjtools_xz_enable /path/to/bundle.
+# Merely sourcing it does not modify the environment or start anything.
+_vjtools_xz_stage_unloaded() {
+    [ "$#" -ge 1 ] && [ "$#" -le 2 ] || return 2
+    vjtools_xz_bundle=$1
+    vjtools_xz_root=/dev/shm/vjtools-xz-support
+    if [ "$#" -eq 2 ]; then
+        [ "${VJTOOLS_XZ_TESTING:-}" = 1 ] || return 2
+        vjtools_xz_root=$2
+    fi
+    case "$vjtools_xz_bundle:$vjtools_xz_root" in *' '*|*'
+'*|*'..'*) return 2;; esac
+    case "$vjtools_xz_bundle$vjtools_xz_root" in *:*) return 2;; esac
+    case "$vjtools_xz_bundle" in /*) ;; *) return 2;; esac
+    case "$vjtools_xz_root" in /*) ;; *) return 2;; esac
+    vjtools_xz_hash=@SHA256@
+    vjtools_xz_md5=@MD5@
+    vjtools_xz_source=$vjtools_xz_bundle/lib/libvjtools-xz-receiver.so
+    [ -f "$vjtools_xz_source" ] && [ ! -L "$vjtools_xz_source" ] || return 1
+    vjtools_xz_digest=$(LD_PRELOAD= md5sum "$vjtools_xz_source") || return 1
+    [ "${vjtools_xz_digest%% *}" = "$vjtools_xz_md5" ] || return 1
+    [ ! -L "$vjtools_xz_root" ] || return 1
+    LD_PRELOAD= mkdir -p "$vjtools_xz_root" || return 1
+    vjtools_xz_dir=$vjtools_xz_root/$vjtools_xz_hash
+    [ ! -L "$vjtools_xz_dir" ] || return 1
+    LD_PRELOAD= mkdir -p "$vjtools_xz_dir" || return 1
+    VJTOOLS_XZ_PRELOAD_PATH=$vjtools_xz_dir/libvjtools-xz-receiver.so
+    [ ! -L "$VJTOOLS_XZ_PRELOAD_PATH" ] || return 1
+    if [ -f "$VJTOOLS_XZ_PRELOAD_PATH" ]; then
+        vjtools_xz_digest=$(LD_PRELOAD= md5sum "$VJTOOLS_XZ_PRELOAD_PATH") || return 1
+        [ "${vjtools_xz_digest%% *}" = "$vjtools_xz_md5" ] || return 1
+        return 0
+    fi
+    vjtools_xz_temp=$(LD_PRELOAD= mktemp -d "$vjtools_xz_dir/.stage.XXXXXX") || return 1
+    if LD_PRELOAD= cp "$vjtools_xz_source" "$vjtools_xz_temp/receiver.so"; then
+        vjtools_xz_digest=$(LD_PRELOAD= md5sum "$vjtools_xz_temp/receiver.so") || vjtools_xz_digest=invalid
+        if [ "${vjtools_xz_digest%% *}" = "$vjtools_xz_md5" ] &&
+           LD_PRELOAD= chmod 444 "$vjtools_xz_temp/receiver.so" &&
+           LD_PRELOAD= mv "$vjtools_xz_temp/receiver.so" "$VJTOOLS_XZ_PRELOAD_PATH"; then
+            LD_PRELOAD= rmdir "$vjtools_xz_temp"
+            return 0
+        fi
+    fi
+    LD_PRELOAD= rm -f "$vjtools_xz_temp/receiver.so"
+    LD_PRELOAD= rmdir "$vjtools_xz_temp"
+    return 1
+}
+vjtools_xz_stage() {
+    vjtools_xz_saved_preload=${LD_PRELOAD-}
+    vjtools_xz_preload_was_set=${LD_PRELOAD+x}
+    LD_PRELOAD=
+    export LD_PRELOAD
+    if _vjtools_xz_stage_unloaded "$@"; then vjtools_xz_stage_result=0; else vjtools_xz_stage_result=$?; fi
+    if [ "$vjtools_xz_preload_was_set" = x ]; then
+        LD_PRELOAD=$vjtools_xz_saved_preload
+        export LD_PRELOAD
+    else
+        unset LD_PRELOAD
+    fi
+    return "$vjtools_xz_stage_result"
+}
+vjtools_xz_preload() {
+    [ "$#" -eq 1 ] && [ -n "$1" ] || return 2
+    # Tokenize only for exact membership; preserve caller's original ordering/text.
+    vjtools_xz_old_ifs=$IFS
+    case $- in *f*) vjtools_xz_glob_was_off=1;; *) vjtools_xz_glob_was_off=0; set -f;; esac
+    IFS=' :'
+    for vjtools_xz_entry in ${LD_PRELOAD:-}; do
+        if [ "$vjtools_xz_entry" = "$1" ]; then IFS=$vjtools_xz_old_ifs; [ "$vjtools_xz_glob_was_off" = 1 ] || set +f; return 0; fi
+    done
+    IFS=$vjtools_xz_old_ifs
+    [ "$vjtools_xz_glob_was_off" = 1 ] || set +f
+    LD_PRELOAD=${LD_PRELOAD:+$LD_PRELOAD:}$1
+    export LD_PRELOAD
+}
+vjtools_xz_enable() {
+    vjtools_xz_stage "$@" || return $?
+    vjtools_xz_preload "$VJTOOLS_XZ_PRELOAD_PATH"
+}

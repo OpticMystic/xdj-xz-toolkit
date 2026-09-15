@@ -1,0 +1,5 @@
+#ifndef __DIRECTFB_BUILD_H__
+#define __DIRECTFB_BUILD_H__
+#define DIRECTFB_BUILD_VOODOO 0
+#define DIRECTFB_BUILD_PURE_VOODOO 0
+#endif

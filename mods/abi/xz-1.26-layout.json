@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "firmware": "XDJ-XZ 1.26",
+  "rbp_sha256": "6571c40b0523954d4091a4649f8200c4c615492fc37bae7f86cc89c6289510d2",
+  "hardware_verified": false,
+  "physical_key_vtable": {
+    "symbol": "_ZTVN2ui13PlayerInnardsE",
+    "address": 4690048,
+    "address_point_offset": 8,
+    "slot_offset_from_symbol": 16,
+    "expected_function": 2680972,
+    "proof": "ELF vtable word at 0x479090 contains 0x28e88c"
+  },
+  "input_layout": {
+    "keycode": {
+      "offset": 8,
+      "type": "uint16_t",
+      "proof_address": "0x28d5cc"
+    },
+    "operation": {
+      "offset": 11,
+      "mask": 15,
+      "proof_address": "0x28d614"
+    },
+    "pad_key_first": 16665,
+    "pad_key_last": 16672,
+    "press_operation": 0,
+    "release_operations": [
+      2,
+      3
+    ],
+    "release_names_verified": false
+  },
+  "player_innards_layout": {
+    "channel_byte": {
+      "offset": 38,
+      "proof_address": "0x28f2ac",
+      "engine_channel": "value == 2 ? 0 : 1"
+    },
+    "dj_engine_if_pointer": {
+      "offset": 48,
+      "type": "pointer32",
+      "proof_address": "0x28f2b4"
+    },
+    "pad_mode_word": {
+      "offset": 128,
+      "proof_address": "0x28d654",
+      "enum_values_verified": false
+    },
+    "held_pad_list": {
+      "offset": 132,
+      "proof_address": "0x28d624"
+    }
+  },
+  "behavioral_hooks_ready": false
+}

@@ -1,0 +1,17 @@
+# Private inputs are never committed here.
+*.key
+rbp
+rbp.patched
+*.UPD
+*.upd
+XDJXZ_v126.zip
+*.zip
+build/*.so
+build/xz-gui-ip-patch
+build/.hook-abi
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+node_modules/
+dist/

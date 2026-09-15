@@ -1,0 +1,12 @@
+Receiver source: source/xz_directfb_hook.c
+Original notice: SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
+one at https://mozilla.org/MPL/2.0/.
+
+The complete pinned receiver source is included in this bundle. Its source
+commit and SHA-256 are recorded in manifest.json. The prebuilt v49 receiver
+is copied unchanged. A reproducible source-to-binary rebuild has not been
+verified by this packaging task. New integration loader and packaging code
+use the repository MIT license, provided separately as LICENSE-MIT.
