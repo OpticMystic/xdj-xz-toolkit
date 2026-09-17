@@ -89,6 +89,13 @@ void xz_ui_render_badge(uint16_t *pixels,size_t stride){
  rect(c,744,0,56,24,0x15191e);border(c,744,0,56,24,0xa8ceff);
  text(c,751,5,"MODS",2,4,0xf4f5f6);
 }
+void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active){
+ if(!pixels||stride<800)return;
+ struct canvas c={pixels,stride,800,480};
+ uint32_t border_col=takeover_active?0x52d794:0xa8ceff;
+ rect(c,0,0,80,24,0x15191e);border(c,0,0,80,24,border_col);
+ text(c,7,5,"VJ.TOOLS",2,8,takeover_active?0x52d794:0xf4f5f6);
+}
 static void add(struct xz_ui_widget *w,size_t *n,int x,int y,int width,int height,
  enum xz_ui_action_kind kind,int index,uint32_t cap,const char *label){
  w[*n]=(struct xz_ui_widget){x,y,width,height,kind,index,cap,label};(*n)++;
@@ -139,8 +146,12 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
  }else if(u->page==XZ_UI_THEMES){
   for(i=0;i<7;i++)add(w,&n,12+(i%3)*262,158+(i/3)*88,252,72,XZ_UI_SET_THEME,i,XZ_UI_THEME,themes[i]);
  }else if(u->page==XZ_UI_CONNECTION){
-  add(w,&n,492,194,296,52,XZ_UI_CONNECTION_ENABLE,0,XZ_UI_VJ_CONNECTION,"VJ CONNECTION");
-  add(w,&n,492,258,296,52,XZ_UI_DISCOVERY,0,XZ_UI_VJ_DISCOVERY,"DISCOVERABLE");
+  add(w,&n,492,142,296,42,XZ_UI_TAKEOVER_TOGGLE,0,0,"FB TAKEOVER");
+  add(w,&n,492,238,94,40,XZ_UI_TAKEOVER_ASSIGN,0,0,"LINK");
+  add(w,&n,592,238,96,40,XZ_UI_TAKEOVER_ASSIGN,1,0,"REKORDBOX");
+  add(w,&n,694,238,94,40,XZ_UI_TAKEOVER_ASSIGN,2,0,"ONSCREEN");
+  add(w,&n,492,290,296,44,XZ_UI_CONNECTION_ENABLE,0,XZ_UI_VJ_CONNECTION,"VJ CONNECTION");
+  add(w,&n,492,346,296,44,XZ_UI_DISCOVERY,0,XZ_UI_VJ_DISCOVERY,"DISCOVERABLE");
  }
  return n;
 }
@@ -174,6 +185,8 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(a.kind==XZ_UI_SHIFT_PAGES)selected=m->shift_pages;
   if(a.kind==XZ_UI_PAD_FEEDBACK)selected=m->pad_feedback;
   if(a.kind==XZ_UI_SHIFT_KEYSYNC)selected=m->shift_keysync;
+  if(a.kind==XZ_UI_TAKEOVER_TOGGLE){color=0x52d794;selected=m->fb_takeover!=0;}
+  if(a.kind==XZ_UI_TAKEOVER_ASSIGN)selected=a.index==m->takeover_assign;
   if(a.kind==XZ_UI_BYPASS)selected=d->bypass;
   if(a.kind==XZ_UI_HOLD)selected=d->hold;
   if(a.kind==XZ_UI_OVERDUB)selected=d->overdub;
@@ -222,7 +235,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
     rect(c,a.x+a.w-63,a.y+10,55,17,p->alarm);
     text(c,a.x+a.w-58,a.y+13,"MUTED",1,9,p->bg);
    }
-   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC)
+   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE)
     text(c,a.x+a.w-40,a.y+18,selected?"ON":"OFF",1,6,selected?p->accent:dim);
    if(a.kind==XZ_UI_ENABLE)text(c,a.x+a.w-78,a.y+16,!available?"NOT READY":selected?"ON":"OFF",1,12,available&&selected?p->accent:dim);
    if(a.kind==XZ_UI_CONNECTION_ENABLE||a.kind==XZ_UI_DISCOVERY)
@@ -277,10 +290,10 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(v->ready&&v->connected&&v->stats_valid)snprintf(buf,sizeof(buf),"%.1f HZ",(double)v->frame_hz);else snprintf(buf,sizeof(buf),"NOT REPORTED");
   text(c,144,338,buf,2,26,p->ink);
   text(c,24,378,"STATUS COMES FROM THE RECEIVER",1,65,dim);
-  text(c,492,330,"FOR VJ.TOOLS LIBRARY",1,48,p->ink);
-  text(c,492,350,"OPTIONAL RECEIVER MODULE",1,48,dim);
-  text(c,492,374,"NO COMPUTER NEEDED TO DJ",1,48,dim);
-  text(c,492,396,"vj.tools",2,24,p->accent);
+  text(c,492,192,m->fb_takeover?"VIDEO / FB TAKEOVER ACTIVE":"STOCK DISPLAY ACTIVE (TAKEOVER OFF)",1,45,m->fb_takeover?p->accent:dim);
+  text(c,492,220,"TAKEOVER BUTTON TRIGGER",1,30,dim);
+  text(c,492,402,"FOR VJ.TOOLS LIBRARY / STANDALONE READY",1,48,p->ink);
+  text(c,492,422,"vj.tools",2,24,p->accent);
   text(c,12,422,"DJ MODS: CDJ3K-MODS / NSAINTOT + CONTRIBUTORS",1,95,dim);
  }
  if(u->page==XZ_UI_SETTINGS)text(c,12,430,m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS",1,115,p->ink);
@@ -323,6 +336,8 @@ static size_t touch_widgets(struct xz_ui *u,const struct xz_ui_model *m,int x,in
   case XZ_UI_SHIFT_PAGES:value=m->shift_pages?0:1;break;
   case XZ_UI_PAD_FEEDBACK:value=m->pad_feedback?0:1;break;
   case XZ_UI_SHIFT_KEYSYNC:value=m->shift_keysync?0:1;break;
+  case XZ_UI_TAKEOVER_TOGGLE:value=m->fb_takeover?0:1;break;
+  case XZ_UI_TAKEOVER_ASSIGN:value=(float)a.index;break;
   case XZ_UI_STEM_PAGE:value=(float)a.index;break;
   case XZ_UI_KEY_SHIFT:value=(float)a.index;break;case XZ_UI_SET_THEME:value=(float)a.index;break;default:break;}
   out[n++]=action(a.kind,XZ_UI_PRESS,u->deck,a.index,value,0);

@@ -16,7 +16,14 @@ stem_page=0
 shift_pages=0
 pad_feedback=1
 shift_keysync=0
+fb_takeover=1
+takeover_assign=0
 ```
+
+`fb_takeover`: 1 (enabled, default), 0 (disabled). Controls whether the VJ.Tools video and composite frame takes over the hardware display framebuffer. When disabled, the native Pioneer XDJ-XZ playback/browse screen is displayed uninterrupted.
+
+`takeover_assign`: 0 (LINK physical button, default), 1 (REKORDBOX physical button), 2 (Onscreen VJ.Tools button in opposite corner from MODS). Selects which control toggles FB display takeover on and off.
+
 
 `stem_page`: 0 Hot Cue, 1 Beat Loop, 2 Slip Loop, 3 Beat Jump. A/B/C toggle
 drums/harmonics/vocals; D toggles bypass while the STEMS controls own the deck.

@@ -23,6 +23,7 @@ static struct xz_audio_status audio_status[2];
 static xz_stock_touch stock_touch;
 static void (*forward_touch)(int, int, int);
 static int started, visible, audio_available, key_available, forwarded_down;
+static int fb_takeover_active = 1;
 static char device_ip[16];
 static struct xz_stem_pads pads;
 static unsigned touch_muted[2];
@@ -35,10 +36,24 @@ static int requested_stems;
 static char settings_usb[1024];
 static struct stat settings_volume;
 
+static int (*stock_uikey_link)(void *);
+static int (*stock_uikey_rekordbox)(void *);
+
+static int uikey_link_hook(void *arg0) {
+    xz_ui_runtime_on_source_key(0);
+    return stock_uikey_link ? stock_uikey_link(arg0) : 0;
+}
+
+static int uikey_rekordbox_hook(void *arg0) {
+    xz_ui_runtime_on_source_key(1);
+    return stock_uikey_rekordbox ? stock_uikey_rekordbox(arg0) : 0;
+}
+
 static struct xz_settings settings_snapshot(void) {
     return (struct xz_settings){requested_stems,
         !!(model.enabled & XZ_UI_GATE), !!(model.enabled & XZ_UI_SMART), model.theme,
-        model.stem_page, model.shift_pages, model.pad_feedback, model.shift_keysync};
+        model.stem_page, model.shift_pages, model.pad_feedback, model.shift_keysync,
+        model.fb_takeover, model.takeover_assign};
 }
 static void settings_queue(void) {
     if (!settings_running) { model.settings_status = "SETTINGS NOT SAVED: START FROM USB"; return; }
@@ -131,12 +146,25 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
                 }
             }
             break;
+        case XZ_UI_TAKEOVER_TOGGLE:
+            model.fb_takeover = !model.fb_takeover;
+            __atomic_store_n(&fb_takeover_active, model.fb_takeover, __ATOMIC_RELEASE);
+            snprintf(ui.notice, sizeof(ui.notice), "FB TAKEOVER %s", model.fb_takeover ? "ENABLED" : "DISABLED");
+            break;
+        case XZ_UI_TAKEOVER_ASSIGN:
+            if (a->index >= 0 && a->index <= 2) {
+                model.takeover_assign = a->index;
+                snprintf(ui.notice, sizeof(ui.notice), "TAKEOVER KEY: %s",
+                    model.takeover_assign == 0 ? "LINK" : (model.takeover_assign == 1 ? "REKORDBOX" : "ONSCREEN"));
+            }
+            break;
         default:
             break; /* Unconnected capabilities remain disabled by the model. */
         }
         if (a->kind == XZ_UI_ENABLE || a->kind == XZ_UI_SET_THEME ||
             a->kind == XZ_UI_STEM_PAGE || a->kind == XZ_UI_SHIFT_PAGES ||
-            a->kind == XZ_UI_PAD_FEEDBACK || a->kind == XZ_UI_SHIFT_KEYSYNC) settings_queue();
+            a->kind == XZ_UI_PAD_FEEDBACK || a->kind == XZ_UI_SHIFT_KEYSYNC ||
+            a->kind == XZ_UI_TAKEOVER_TOGGLE || a->kind == XZ_UI_TAKEOVER_ASSIGN) settings_queue();
     }
 }
 
@@ -241,8 +269,25 @@ __attribute__((visibility("default"))) int xz_mods_native_touch_v1(void) {
     return __atomic_load_n(&started, __ATOMIC_ACQUIRE);
 }
 
+__attribute__((visibility("default"))) int xz_mods_takeover_v1(void) {
+    return __atomic_load_n(&fb_takeover_active, __ATOMIC_ACQUIRE);
+}
+
 static void badge(uint16_t *pixels, uint32_t stride) {
     xz_ui_render_badge(pixels,stride);
+    if (model.takeover_assign == XZ_TAKEOVER_ONSCREEN) {
+        xz_ui_render_vj_button(pixels, stride, model.fb_takeover);
+    }
+}
+
+void xz_ui_runtime_on_source_key(int source) {
+    if (!__atomic_load_n(&started, __ATOMIC_ACQUIRE)) return;
+    pthread_mutex_lock(&ui_mutex);
+    if (model.takeover_assign == source) {
+        struct xz_ui_action act = { .kind = XZ_UI_TAKEOVER_TOGGLE };
+        apply(NULL, &act, 1);
+    }
+    pthread_mutex_unlock(&ui_mutex);
 }
 
 __attribute__((visibility("default"))) int xz_mods_render_v1(uint16_t *pixels, uint32_t width,
@@ -273,6 +318,8 @@ __attribute__((visibility("default"))) int xz_mods_render_v1(uint16_t *pixels, u
 
 int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     static const unsigned char guard[8] = {0xf0,0x45,0x2d,0xe9,0x02,0x70,0xa0,0xe1};
+    static const unsigned char link_guard[8] = {0x70,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
+    static const unsigned char rekordbox_guard[8] = {0x38,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
     if (started) return 0;
     settings_usb[0] = 0; settings_pending = 0;
     forward_touch = (void (*)(int,int,int))dlsym(RTLD_DEFAULT, "xz_vj_touch_v1");
@@ -281,6 +328,9 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     key_available = key_ready;
     memset(&model, 0, sizeof(model));
     model.pad_feedback = 1;
+    model.fb_takeover = 1;
+    model.takeover_assign = XZ_TAKEOVER_LINK;
+    __atomic_store_n(&fb_takeover_active, 1, __ATOMIC_RELEASE);
     requested_stems = !!stems_enabled;
     model.settings_status = "SETTINGS NOT SAVED: START FROM USB";
     model.enabled = xz_runtime_cue_flags();
@@ -295,6 +345,9 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
             model.theme = saved.theme; model.stem_page = saved.stem_page;
             model.shift_pages = saved.shift_pages; model.pad_feedback = saved.pad_feedback;
             model.shift_keysync = saved.shift_keysync;
+            model.fb_takeover = saved.fb_takeover;
+            model.takeover_assign = saved.takeover_assign;
+            __atomic_store_n(&fb_takeover_active, model.fb_takeover, __ATOMIC_RELEASE);
             xz_runtime_set_cues(saved.gate,saved.smart);
             model.enabled = xz_runtime_cue_flags();
             if (audio_ready) { xz_audio_set_enabled(saved.stems); if (saved.stems) model.enabled |= XZ_UI_STEM; }
@@ -312,6 +365,10 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     xz_native_touch_init(&touch, &ui, &model, apply, NULL);
     refresh();
     if (xz_hook_arm(0x2628b4, guard, (void *)touch_hook, (void **)&stock_touch) != 0) return -1;
+    if (xz_hook_arm(0xdf994, link_guard, (void *)uikey_link_hook, (void **)&stock_uikey_link) != 0)
+        xz_log("Source key LINK hook unavailable");
+    if (xz_hook_arm(0xe0a50, rekordbox_guard, (void *)uikey_rekordbox_hook, (void **)&stock_uikey_rekordbox) != 0)
+        xz_log("Source key REKORDBOX hook unavailable");
     if (settings_usb[0]) {
         settings_running = 1;
         if (pthread_create(&settings_thread,NULL,settings_writer,NULL)) {

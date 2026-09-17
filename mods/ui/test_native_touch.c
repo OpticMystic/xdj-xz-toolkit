@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <string.h>
 struct fake_solver { uint32_t owner;struct xz_touch_status previous;int calls,releases; };
+static struct xz_ui_action last_act;
+static void test_apply(void*p,const struct xz_ui_action*a,size_t n) {
+ (void)p;if(n>0)last_act=a[0];
+}
 static void stock(void*p,const struct xz_touch_status*s,const void*m) {
  struct fake_solver*f=p;(void)m;f->calls++;if(f->previous.down&&!s->down)f->releases++;f->previous=*s;
 }
@@ -31,6 +35,29 @@ int main(void) {
  s.x=760;s.y=10;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
  assert(!touch.visible&&!touch.capture&&solver.previous.down);
  s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
+  /* Top-left VJ button touch when not assigned to onscreen passes through to stock */
+  model.takeover_assign=0;
+  s=(struct xz_touch_status){1,{0,0,0},40,10};
+  int prev_calls=solver.calls;
+  xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
+  assert(solver.calls==prev_calls+1&&!touch.visible&&!touch.capture);
+  s.down=0;
+  xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
+
+  /* Top-left VJ button touch when assigned to onscreen intercepts and emits XZ_UI_TAKEOVER_TOGGLE */
+  touch.apply=test_apply;
+  model.takeover_assign=2;
+  memset(&last_act,0,sizeof(last_act));
+  s=(struct xz_touch_status){1,{0,0,0},40,10};
+  prev_calls=solver.calls;
+  assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
+  assert(solver.calls==prev_calls&&!touch.visible&&touch.capture);
+  assert(last_act.kind==XZ_UI_TAKEOVER_TOGGLE);
+  s.down=0;
+  assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
+  assert(!touch.capture);
+  touch.apply=NULL;
+  model.takeover_assign=0;
  /* Inline region uses fixture coordinates, not a claimed native layout. */
  struct xz_touch_region r={120,220,500,60};
  assert(xz_native_touch_region(&touch,&r));

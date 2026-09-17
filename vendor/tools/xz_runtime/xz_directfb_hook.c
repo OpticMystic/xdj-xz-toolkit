@@ -108,6 +108,7 @@ static pthread_once_t mods_bridge_once = PTHREAD_ONCE_INIT;
 static xz_mods_visible_fn_v1 mods_visible;
 static xz_mods_native_touch_fn_v1 mods_native_touch;
 static xz_mods_render_fn_v1 mods_render;
+static xz_mods_takeover_fn_v1 mods_takeover;
 static uint32_t vj_listener_ready;
 static uint32_t vj_discovery_ready;
 static uint32_t vj_received_image_count;
@@ -270,6 +271,7 @@ static void resolve_mods_bridge(void) {
     mods_visible = (xz_mods_visible_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_visible_v1");
     mods_native_touch = (xz_mods_native_touch_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_native_touch_v1");
     mods_render = (xz_mods_render_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_render_v1");
+    mods_takeover = (xz_mods_takeover_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_takeover_v1");
 }
 
 static int mods_panel_visible(void) {
@@ -549,6 +551,7 @@ static void mark_overlay_activity(void) {
 static int vj_overlay_is_active(void) {
     uint32_t last;
     uint32_t now;
+    if (mods_takeover && !mods_takeover()) return 0;
     if (access("/tmp/xz_overlay_enabled", F_OK) == 0) return 1;
     last = last_activity_ms;
     if (last == 0u) return 0;

@@ -10,8 +10,12 @@ int main(void) {
     char text[512], root[]="/tmp/xz-settings-XXXXXX",path[1024];
     xz_settings_default(&a);
     assert(!a.shift_keysync && a.pad_feedback && !a.stems);
+    assert(a.fb_takeover == 1 && a.takeover_assign == XZ_TAKEOVER_LINK);
+    const char *legacy = "XZ_MODS_SETTINGS 1\nstems=0\ngate=0\nsmart=0\ntheme=0\nstem_page=0\nshift_pages=0\npad_feedback=1\nshift_keysync=0\n";
+    assert(xz_settings_parse(legacy, &b) == 0 && b.fb_takeover == 1 && b.takeover_assign == XZ_TAKEOVER_LINK);
     for (int page=0;page<4;page++) {
         a.stems=1;a.stem_page=page;a.shift_pages=1;a.shift_keysync=1;a.theme=6;
+        a.fb_takeover=page%2;a.takeover_assign=page%3;
         assert(xz_settings_format(&a,text,sizeof(text))>0);
         assert(!xz_settings_parse(text,&b) && !memcmp(&a,&b,sizeof(a)));
     }

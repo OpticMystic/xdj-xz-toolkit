@@ -21,7 +21,8 @@ enum xz_ui_action_kind {
     XZ_UI_SAMPLE_PAD, XZ_UI_STRIP, XZ_UI_HOLD, XZ_UI_OVERDUB, XZ_UI_VOLUME,
     XZ_UI_SET_THEME, XZ_UI_SERVER_AUTO, XZ_UI_SERVER_ADDRESS, XZ_UI_KEY_SHIFT,
     XZ_UI_KEY_SYNC, XZ_UI_HOTCUE_PAD, XZ_UI_CONNECTION_ENABLE, XZ_UI_DISCOVERY,
-    XZ_UI_STEM_PAGE, XZ_UI_SHIFT_PAGES, XZ_UI_PAD_FEEDBACK, XZ_UI_SHIFT_KEYSYNC
+    XZ_UI_STEM_PAGE, XZ_UI_SHIFT_PAGES, XZ_UI_PAD_FEEDBACK, XZ_UI_SHIFT_KEYSYNC,
+    XZ_UI_TAKEOVER_TOGGLE, XZ_UI_TAKEOVER_ASSIGN
 };
 enum xz_ui_phase { XZ_UI_PRESS, XZ_UI_MOVE, XZ_UI_RELEASE };
 struct xz_ui_action {
@@ -57,6 +58,7 @@ struct xz_ui_model {
     unsigned blink;
     struct xz_ui_connection connection;
     int stem_page, shift_pages, pad_feedback, shift_keysync;
+    int fb_takeover, takeover_assign;
     const char *settings_status;
 };
 struct xz_ui {
@@ -86,4 +88,5 @@ uint32_t xz_ui_stem_color(int theme,int index);
 int xz_ui_inline_render(const struct xz_ui *,const struct xz_ui_model *,uint16_t *,size_t count,size_t stride,int width,int height);
 size_t xz_ui_inline_touch(struct xz_ui *,const struct xz_ui_model *,int width,int height,int x,int y,int down,struct xz_ui_action out[XZ_UI_ACTIONS]);
 void xz_ui_render_badge(uint16_t *pixels,size_t stride);
+void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active);
 #endif

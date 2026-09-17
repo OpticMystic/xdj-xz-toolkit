@@ -1,4 +1,5 @@
 #include "native_touch.h"
+#include "../settings.h"
 #include <stddef.h>
 #include <string.h>
 _Static_assert(sizeof(struct xz_touch_status)==12,"XZ TouchStatus ABI");
@@ -7,6 +8,7 @@ _Static_assert(offsetof(struct xz_touch_status,y)==8,"XZ touch y offset");
 void xz_native_touch_init(struct xz_native_touch*t,struct xz_ui*ui,const struct xz_ui_model*model,xz_touch_actions apply,void*ctx) {
  memset(t,0,sizeof(*t));t->ui=ui;t->model=model;t->apply=apply;t->context=ctx;
  t->badge_x=744;t->badge_y=0;t->badge_w=56;t->badge_h=24;
+ t->vj_btn_x=0;t->vj_btn_y=0;t->vj_btn_w=80;t->vj_btn_h=24;
 }
 void xz_native_touch_visible(struct xz_native_touch*t,int visible) {
  if(t->visible&&!visible) {
@@ -18,6 +20,10 @@ void xz_native_touch_visible(struct xz_native_touch*t,int visible) {
 static int badge(const struct xz_native_touch*t,const struct xz_touch_status*s) {
  return s->x>=(uint32_t)t->badge_x&&s->y>=(uint32_t)t->badge_y&&
         s->x<(uint32_t)(t->badge_x+t->badge_w)&&s->y<(uint32_t)(t->badge_y+t->badge_h);
+}
+static int vj_btn(const struct xz_native_touch*t,const struct xz_touch_status*s) {
+ return s->x>=(uint32_t)t->vj_btn_x&&s->y>=(uint32_t)t->vj_btn_y&&
+        s->x<(uint32_t)(t->vj_btn_x+t->vj_btn_w)&&s->y<(uint32_t)(t->vj_btn_y+t->vj_btn_h);
 }
 int xz_native_touch_region(struct xz_native_touch*t,const struct xz_touch_region*r) {
  if(t->visible||t->capture)return 0;
@@ -36,6 +42,11 @@ int xz_native_touch_dispatch(struct xz_native_touch*t,void*self,const struct xz_
  memcpy(&previous,(const char*)self+4,sizeof(previous));
  if(!t->visible&&!t->capture&&s->down&&!previous.down&&badge(t,s)) {
   t->visible=1;t->capture=1;t->opening_contact=1;
+ }
+ if(!t->visible&&!t->capture&&s->down&&!previous.down&&t->model&&t->model->takeover_assign==XZ_TAKEOVER_ONSCREEN&&vj_btn(t,s)) {
+  t->capture=1;t->opening_contact=1;
+  struct xz_ui_action act={.kind=XZ_UI_TAKEOVER_TOGGLE};
+  if(t->apply)t->apply(t->context,&act,1);
  }
  if(t->visible&&!t->capture&&(!t->regional||(s->down&&!previous.down&&region(t,s))))t->capture=1;
  if(!t->capture) {stock(self,s,mode);return 0;}

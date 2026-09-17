@@ -119,6 +119,16 @@ int main(int argc,char **argv){
  assert(result.kind==XZ_UI_DISCOVERY&&result.value==1);
  m.connection.discoverable=1;
  assert(tap(&u,&m,XZ_UI_DISCOVERY,0).value==0);
+ result=tap(&u,&m,XZ_UI_TAKEOVER_TOGGLE,0);
+ assert(result.kind==XZ_UI_TAKEOVER_TOGGLE);
+ result=tap(&u,&m,XZ_UI_TAKEOVER_ASSIGN,0);
+ assert(result.kind==XZ_UI_TAKEOVER_ASSIGN&&result.index==0);
+ result=tap(&u,&m,XZ_UI_TAKEOVER_ASSIGN,1);
+ assert(result.kind==XZ_UI_TAKEOVER_ASSIGN&&result.index==1);
+ result=tap(&u,&m,XZ_UI_TAKEOVER_ASSIGN,2);
+ assert(result.kind==XZ_UI_TAKEOVER_ASSIGN&&result.index==2);
+ xz_ui_render_vj_button(frame,800,1);
+ xz_ui_render_vj_button(frame,800,0);
  tap(&u,&m,XZ_UI_DECK,3);assert(u.deck==3);
  assert(tap(&u,&m,XZ_UI_CONNECTION_ENABLE,0).kind==XZ_UI_CONNECTION_ENABLE);
  tap(&u,&m,XZ_UI_PANEL,XZ_UI_STEMS);assert(tap(&u,&m,XZ_UI_LEVEL,0).kind==XZ_UI_UNAVAILABLE);

@@ -33,7 +33,7 @@ struct code_hook {
     void *trampoline;
     int protection;
 };
-static struct code_hook code_hooks[5];
+static struct code_hook code_hooks[16];
 static unsigned code_hook_count;
 struct pad_trace_record { uint32_t key,operation_byte,channel,mode,decoded,deck,pad,operation,hotcue,ui_flags; };
 struct pad_trace { uint32_t version,sequence,count,enabled;struct pad_trace_record records[64]; };
@@ -126,13 +126,17 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
     static const unsigned char unload_guard[8] = {0x70,0x40,0x2d,0xe9,0x28,0x50,0x80,0xe2};
     static const unsigned char touch_guard[8] = {0xf0,0x45,0x2d,0xe9,0x02,0x70,0xa0,0xe1};
     static const unsigned char output_guard[8] = {0xf0,0x41,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
+    static const unsigned char link_guard[8] = {0x70,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
+    static const unsigned char rekordbox_guard[8] = {0x38,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
     const unsigned char *guard = address == 0x8fd5c ? source_guard :
                                  address == 0x34ba0 ? load_guard :
                                  address == 0x348dc ? unload_guard :
                                  address == 0x2628b4 ? touch_guard :
-                                 address == 0x76284 ? output_guard : NULL;
+                                 address == 0x76284 ? output_guard :
+                                 address == 0xdf994 ? link_guard :
+                                 address == 0xe0a50 ? rekordbox_guard : NULL;
     if (!application_verified || !guard || !expected || !replacement || !original ||
-        code_hook_count >= 5 || memcmp(expected, guard, 8) != 0) return -1;
+        code_hook_count >= sizeof(code_hooks)/sizeof(code_hooks[0]) || memcmp(expected, guard, 8) != 0) return -1;
     int protection = range_protection(address, 8);
     if (protection < 0 || !(protection & PROT_READ) ||
         memcmp((void *)(uintptr_t)address, guard, 8) != 0) return -1;

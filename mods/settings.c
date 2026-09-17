@@ -9,22 +9,34 @@
 #include <unistd.h>
 #include <fcntl.h>
 void xz_settings_default(struct xz_settings *s) {
-    *s = (struct xz_settings){0,0,0,0,0,0,1,0};
+    *s = (struct xz_settings){0,0,0,0,0,0,1,0,1,0};
 }
 static int valid(const struct xz_settings *s) {
     return (unsigned)s->stems <= 1 && (unsigned)s->gate <= 1 &&
         (unsigned)s->smart <= 1 && (unsigned)s->theme <= 6 &&
         (unsigned)s->stem_page <= 3 && (unsigned)s->shift_pages <= 1 &&
-        (unsigned)s->pad_feedback <= 1 && (unsigned)s->shift_keysync <= 1;
+        (unsigned)s->pad_feedback <= 1 && (unsigned)s->shift_keysync <= 1 &&
+        (unsigned)s->fb_takeover <= 1 && (unsigned)s->takeover_assign <= 2;
 }
 int xz_settings_parse(const char *text, struct xz_settings *out) {
     struct xz_settings s;
     const char *header = "XZ_MODS_SETTINGS 1\n";
-    const char *keys[] = {"stems=","gate=","smart=","theme=","stem_page=","shift_pages=","pad_feedback=","shift_keysync="};
-    int *values[] = {&s.stems,&s.gate,&s.smart,&s.theme,&s.stem_page,&s.shift_pages,&s.pad_feedback,&s.shift_keysync};
+    const char *keys[] = {
+        "stems=","gate=","smart=","theme=","stem_page=",
+        "shift_pages=","pad_feedback=","shift_keysync=",
+        "fb_takeover=","takeover_assign="
+    };
+    int *values[] = {
+        &s.stems,&s.gate,&s.smart,&s.theme,&s.stem_page,
+        &s.shift_pages,&s.pad_feedback,&s.shift_keysync,
+        &s.fb_takeover,&s.takeover_assign
+    };
     if (strncmp(text,header,strlen(header))) return -1;
     text += strlen(header);
-    for (unsigned i=0;i<8;i++) {
+    s.fb_takeover = 1;
+    s.takeover_assign = 0;
+    for (unsigned i=0;i<10;i++) {
+        if (i >= 8 && *text == '\0') break;
         size_t size = strlen(keys[i]);
         if (strncmp(text,keys[i],size)) return -1;
         text += size;
@@ -36,8 +48,8 @@ int xz_settings_parse(const char *text, struct xz_settings *out) {
 }
 int xz_settings_format(const struct xz_settings *s, char *out, size_t size) {
     if (!valid(s)) return -1;
-    int n = snprintf(out,size,"XZ_MODS_SETTINGS 1\nstems=%d\ngate=%d\nsmart=%d\ntheme=%d\nstem_page=%d\nshift_pages=%d\npad_feedback=%d\nshift_keysync=%d\n",
-        s->stems,s->gate,s->smart,s->theme,s->stem_page,s->shift_pages,s->pad_feedback,s->shift_keysync);
+    int n = snprintf(out,size,"XZ_MODS_SETTINGS 1\nstems=%d\ngate=%d\nsmart=%d\ntheme=%d\nstem_page=%d\nshift_pages=%d\npad_feedback=%d\nshift_keysync=%d\nfb_takeover=%d\ntakeover_assign=%d\n",
+        s->stems,s->gate,s->smart,s->theme,s->stem_page,s->shift_pages,s->pad_feedback,s->shift_keysync,s->fb_takeover,s->takeover_assign);
     return n < 0 || (size_t)n >= size ? -1 : n;
 }
 static int paths(const char *usb, char *dir, char *file) {
