@@ -1,0 +1,18 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update -qq \
+    && apt-get install -y -qq gcc-arm-linux-gnueabihf libc6-dev-armhf-cross binutils make curl ca-certificates qemu-user \
+    && rm -rf /var/lib/apt/lists/*
+
+# The XZ has an older, incompatible glibc loader. Link this standalone helper
+# with musl so it needs neither the device's loader nor its libc.
+RUN curl -fSL https://musl.libc.org/releases/musl-1.2.5.tar.gz -o /tmp/musl.tar.gz \
+    && mkdir /tmp/musl \
+    && tar -xzf /tmp/musl.tar.gz -C /tmp/musl --strip-components=1 \
+    && cd /tmp/musl \
+    && CC=arm-linux-gnueabihf-gcc CROSS_COMPILE=arm-linux-gnueabihf- ./configure --target=arm-linux-musleabihf --prefix=/opt/musl --disable-shared \
+    && make -j4 \
+    && make install \
+    && rm -rf /tmp/musl /tmp/musl.tar.gz
+
+WORKDIR /src

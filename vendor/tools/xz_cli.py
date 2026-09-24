@@ -2,7 +2,10 @@
 
 import argparse
 import hashlib
+import json
+import os
 import pathlib
+import shutil
 import sys
 import tempfile
 
@@ -13,6 +16,7 @@ if str(ROOT_DIR) not in sys.path:
 from tools.xz_firmware.image_builder import build_autoexec_bin, extract_autoexec_file, verify_autoexec_bin
 from tools.xz_firmware.key_manager import get_key_path
 from tools.xz_firmware.payload import write_runtime_payload
+from tools.xz_firmware.mods_bundle import load_mods_bundle
 from tools.xz_patcher.deck_select_4deck import PATCHES_1_26 as DECK_PATCHES
 from tools.xz_patcher.deck_select_4deck import patch_rbp as patch_4deck
 from tools.xz_patcher.ui_watermark import PATCHES_1_26 as SETTINGS_MARKER_PATCHES
@@ -32,6 +36,8 @@ def cmd_build_usb(args):
 
     rbp_data = stock_rbp.read_bytes()
     features = []
+    mods_root = pathlib.Path(args.mods_bundle) if args.mods_bundle else None
+    mods_manifest = load_mods_bundle(mods_root) if mods_root else None
     print(f"Loaded stock rbp binary ({len(rbp_data):,} bytes)")
     print("\nApplying firmware 1.26 patches:")
 
@@ -49,6 +55,11 @@ def cmd_build_usb(args):
     fb_overlay_helper_path = pathlib.Path(args.fb_overlay_helper) if args.fb_overlay_helper else None
     directfb_hook_path = pathlib.Path(args.directfb_hook) if args.directfb_hook else None
     gui_ip_patch_path = pathlib.Path(args.gui_ip_patch) if args.gui_ip_patch else None
+    if mods_root:
+        if hashlib.md5(rbp_data).hexdigest() != mods_manifest["application_md5"]:
+            raise ValueError("XZ Mods requires the matched XDJ-XZ 1.26 application patches")
+        directfb_hook_path = mods_root / "libxz-receiver.so"
+        features.append("XZ Mods menus and standalone runtime")
     if gui_pack_path:
         if not gui_pack_path.is_file():
             raise SystemExit(f"Error: GUI pack not found at {gui_pack_path}")
@@ -66,7 +77,7 @@ def cmd_build_usb(args):
             raise SystemExit(f"Error: GUI IP patcher not found at {gui_ip_patch_path}")
         features.append("runtime_ip_logo")
 
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(prefix=".xz-build-", dir=target_drive) as td:
         staging = pathlib.Path(td)
         payload_meta = write_runtime_payload(
             staging,
@@ -78,7 +89,13 @@ def cmd_build_usb(args):
             fb_overlay_helper_path=fb_overlay_helper_path,
             directfb_hook_path=directfb_hook_path,
             gui_ip_patch_path=gui_ip_patch_path,
+            orchestrator_path=mods_root / "bootstrap.sh" if mods_root else None,
+            mods_runtime_path=mods_root / "libxz-mods.so" if mods_root else None,
+            mods_mode="experimental" if mods_root else "observer",
         )
+        if mods_root:
+            shutil.copytree(mods_root / "licenses", staging / "licenses")
+            print(f"  [+] XZ Mods menu runtime: {mods_manifest['files']['libxz-mods.so']}")
         if args.telnet:
             print("  [+] Diagnostic Telnet shell (TCP 2323)")
         if args.vj_bridge_marker:
@@ -94,10 +111,24 @@ def cmd_build_usb(args):
             print(f"  [+] Runtime GUI IP patcher MD5: {payload_meta['gui_ip_patch_md5']}")
 
         out_bin = target_drive / "autoexec.bin"
+        pending = staging / "image.pending"
         print("\nAuthoring encrypted autoexec.bin...")
-        size = build_autoexec_bin(staging, out_bin, key_path)
+        size = build_autoexec_bin(staging, pending, key_path)
+        structure = verify_autoexec_bin(pending, key_path)
+        if mods_root:
+            for member in ("autoexec.sh", "mods-mode", "tools/libxz-mods.so", "tools/libxz-directfb-hook.so"):
+                if extract_autoexec_file(pending, key_path, "/" + member) != (staging / member).read_bytes():
+                    raise ValueError(f"XZ Mods encrypted payload verification failed: {member}")
+        os.replace(pending, out_bin)
         print(f"Successfully created {out_bin} ({size:,} bytes)")
-        print(f"Verified image: {verify_autoexec_bin(out_bin, key_path)}")
+        print(f"Verified image: {structure}")
+        if mods_root:
+            report = {"firmware": "XDJ-XZ 1.26", "profile": "experimental", "hardware_qualified": False,
+                      "image_sha256": hashlib.sha256(out_bin.read_bytes()).hexdigest(),
+                      "runtime_sha256": mods_manifest["files"]["libxz-mods.so"],
+                      "receiver_sha256": mods_manifest["files"]["libxz-receiver.so"],
+                      "source_commit": mods_manifest["source_commit"], "payload": payload_meta}
+            (target_drive / "XZMOD_BUILD.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf8")
 
 
 def _patch_state(binary: bytes, patches) -> str:
@@ -111,6 +142,11 @@ def _patch_state(binary: bytes, patches) -> str:
         else:
             states.append("unknown")
     return states[0] if len(set(states)) == 1 else "mixed/unknown"
+
+
+def latest_runtime_session(session: str) -> str:
+    marker = "=== XDJ-XZ Diagnostic Native Loader"
+    return session.rsplit(marker, 1)[1] if marker in session else ""
 
 
 def cmd_audit_usb(args):
@@ -170,11 +206,30 @@ def cmd_audit_usb(args):
     except Exception:
         print("VJ FILMSTRIP HOOK: not included")
 
+    mods_md5 = ""
+    try:
+        mods = extract_autoexec_file(image, key_path, "/tools/libxz-mods.so")
+    except Exception:
+        mods = None
+    if mods is not None:
+        mods_md5 = hashlib.md5(mods).hexdigest()
+        mods_expected = extract_autoexec_file(image, key_path, "/tools/libxz-mods.so.md5").decode("ascii").split()[0]
+        mods_mode = extract_autoexec_file(image, key_path, "/mods-mode").decode("ascii").strip()
+        mods_ok = mods_md5 == mods_expected and mods_mode == "experimental" and b'XZ_MODS_UI="$MODS_UI"' in script
+        print(f"XZ MODS MENUS: {'PASS' if mods_ok else 'FAIL'} mode={mods_mode} md5={mods_md5}")
+        if not mods_ok:
+            failures.append("XZ Mods runtime checksum or menu launch profile is invalid")
+    else:
+        print("XZ MODS MENUS: not included (receiver-only payload)")
+
     session_path = target / "XZ_RUNTIME/session.txt" if target.is_dir() else image.parent / "XZ_RUNTIME/session.txt"
     session = session_path.read_text(encoding="utf-8", errors="replace") if session_path.is_file() else ""
+    session = latest_runtime_session(session)
     runtime_ok = (
         f"md5={rbp_md5} expected={rbp_md5}" in session
         and "SUCCESS: Patched rbp survived and its executable hash matches the payload." in session
+        and "FAILED:" not in session
+        and (not mods_md5 or f"Standalone runtime staged in RAM: mode=experimental md5={mods_md5}" in session)
     )
     print(f"RUNTIME: {'PASS' if runtime_ok else 'FAIL'} patched executable survival/hash proof")
     if not runtime_ok:
@@ -203,6 +258,7 @@ def main():
     build_p.add_argument("--fb-overlay-helper", help="Path to the static ARM framebuffer helper to stage in RAM")
     build_p.add_argument("--directfb-hook", help="Path to the ARM libxz-directfb-hook.so VJ.Tools receiver")
     build_p.add_argument("--gui-ip-patch", help="Path to the ARM runtime logo IP patcher")
+    build_p.add_argument("--mods-bundle", help="Verified standalone XZ Mods runtime and paired receiver bundle")
 
     audit_p = sub.add_parser("audit-usb", help="Audit an image and captured hardware runtime proof")
     audit_p.add_argument("target_drive", help="USB root or path to autoexec.bin")
