@@ -44,6 +44,11 @@ static int enabled(const char *name) {
     return value && strcmp(value, "1") == 0;
 }
 
+static int enabled_default(const char *name, int fallback) {
+    const char *value = getenv(name);
+    return value ? strcmp(value, "0") != 0 : fallback;
+}
+
 void xz_log(const char *message) {
     FILE *file = fopen("/dev/shm/xz-mods.log", "a");
     if (file) { fprintf(file, "%s\n", message); fclose(file); }
@@ -131,6 +136,7 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
     static const unsigned char wave_lock_guard[8] = {0x38,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
     static const unsigned char wave_unlock_guard[8] = {0x10,0x40,0x2d,0xe9,0x58,0xd0,0x4d,0xe2};
     static const unsigned char mixer_receive_guard[8] = {0x40,0x32,0xd0,0xe5,0xf0,0x47,0x2d,0xe9};
+    static const unsigned char mixer_midi_cc_guard[8] = {0x80,0x00,0x13,0xe3,0xb0,0x10,0x81,0xe3};
     const unsigned char *guard = address == 0x8fd5c ? source_guard :
                                  address == 0x34ba0 ? load_guard :
                                  address == 0x348dc ? unload_guard :
@@ -140,7 +146,8 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
                                  address == 0xe0a50 ? rekordbox_guard :
                                  address == 0x156958 ? wave_lock_guard :
                                  address == 0x1656c4 ? wave_unlock_guard :
-                                 address == 0x25d7f4 ? mixer_receive_guard : NULL;
+                                 address == 0x25d7f4 ? mixer_receive_guard :
+                                 address == 0x2bde78 ? mixer_midi_cc_guard : NULL;
     if (!application_verified || !guard || !expected || !replacement || !original ||
         code_hook_count >= sizeof(code_hooks)/sizeof(code_hooks[0]) || memcmp(expected, guard, 8) != 0) return -1;
     int protection = range_protection(address, 8);
@@ -271,9 +278,10 @@ __attribute__((constructor)) static void start(void) {
     xz_log(observer ? "OBSERVER installed; stock dispatch retained" : "EXPERIMENTAL gate/smart cue adapter installed");
     if (observer) return;
     int audio_ready = memory_fd >= 0 && xz_audio_start() == 0;
+    int stems_default = enabled_default("XZ_MODS_STEMS", 1);
     int key_ready = audio_ready && enabled("XZ_MODS_KEYSHIFT") && xz_key_runtime_start() == 0;
-    if (audio_ready && enabled("XZ_MODS_STEMS")) xz_audio_set_enabled(1);
-    if (enabled("XZ_MODS_UI")) xz_ui_runtime_start(audio_ready, key_ready, enabled("XZ_MODS_STEMS"));
+    if (audio_ready && stems_default) xz_audio_set_enabled(1);
+    if (enabled("XZ_MODS_UI")) xz_ui_runtime_start(audio_ready, key_ready, stems_default);
 }
 
 __attribute__((destructor)) static void stop(void) {

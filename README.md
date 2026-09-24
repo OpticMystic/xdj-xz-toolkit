@@ -76,4 +76,8 @@ See [the format and runtime contract](mods/audio/OVERCUE.md) and
 checker from the same decoder. The separation workflow still writes legacy
 stemd caches; it does not export OverCue bundles.
 
-The 0.1.2 preview adds native spare-channel EQ and an always-visible VJ.Tools / Exit VJ toggle. See [the controls contract](mods/ui/README.md) for USB-source lockouts, pickup and the hardware acceptance boundary. Both the standalone builder and Library loader now validate the same paired runtime and its native sources.
+The 0.1.2 preview adds native spare-channel EQ, connection-gated VJ.Tools access
+and selectable stem banks. See [the controls contract](mods/ui/README.md) for
+USB-source lockouts, pickup and the hardware acceptance boundary. Both the
+standalone builder and Library loader validate the same paired runtime and its
+native sources.

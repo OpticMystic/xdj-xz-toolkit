@@ -30,7 +30,7 @@ int main(int argc,char **argv){
  struct xz_ui u;struct xz_ui_model m;struct xz_ui_action a[XZ_UI_ACTIONS],result;struct xz_ui_widget w;int i,j;
  if(argc>1&&strcmp(argv[1],"--prove-assertions")==0){assert(!"assertions-active");return 1;}
  memset(&m,0,sizeof(m));xz_ui_init(&u);m.server_auto=1;m.blink=1;
- assert(xz_ui_stem_color(0,0)==0xff577d&&xz_ui_stem_color(0,1)==0x699cff&&xz_ui_stem_color(0,2)==0x52d794);
+ assert(xz_ui_stem_color(0,0)==0xff3b30&&xz_ui_stem_color(0,1)==0x2997ff&&xz_ui_stem_color(0,2)==0x30d158);
  assert(xz_ui_stem_color(-1,9)==xz_ui_stem_color(0,0));
  for(i=0;i<4;i++){m.deck[i].groove_active=-1;m.deck[i].sample_active=-1;m.deck[i].sample_volume=1;for(j=0;j<3;j++)m.deck[i].levels[j]=1;}
  assert(tap(&u,&m,XZ_UI_BYPASS,0).kind==XZ_UI_UNAVAILABLE);assert(strstr(u.notice,"NOT READY"));

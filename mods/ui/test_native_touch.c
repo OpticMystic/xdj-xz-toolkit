@@ -36,6 +36,7 @@ int main(void) {
  assert(!touch.visible&&!touch.capture&&solver.previous.down);
  s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
  touch.apply=test_apply;
+ model.connection.connected=1;
  for(int assignment=0;assignment<3;assignment++){
   model.takeover_assign=assignment;memset(&last_act,0,sizeof(last_act));
   s=(struct xz_touch_status){1,{0,0,0},40,10};int prev_calls=solver.calls;
@@ -54,6 +55,10 @@ int main(void) {
  s.down=0;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(!touch.vj_contact&&solver.calls==untouched);
  s.down=1;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(solver.calls==untouched+1);
  s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);model.connection.connected=0;
+ int offline_calls=solver.calls;
+ s=(struct xz_touch_status){1,{0,0,0},40,10};
+ assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock)&&solver.calls==offline_calls+1);
+ s.down=0;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
  /* Inline region uses fixture coordinates, not a claimed native layout. */
  struct xz_touch_region r={120,220,500,60};
  assert(xz_native_touch_region(&touch,&r));

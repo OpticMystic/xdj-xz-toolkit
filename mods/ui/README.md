@@ -98,12 +98,14 @@ compilation passed. DirectFB presentation, physical touch routing, audio actions
 and complete stock-screen recoloring remain separate runtime acceptance gates.
 ## Physical stem pads
 
-With stems enabled, HOT CUE A toggles Vocals, B Harmonics, C Drums, and D
-bypass on that physical deck. The screen and pad LED colors use that same order.
-The audio engine retains its internal Drums/Harmonics/Vocals storage order.
-Both decks stay independent while MODS or the inline strip is hidden. E-H
-retain their normal hot cues. Turning stems off restores normal pad dispatch,
-including paired releases for presses already owned by the mod.
+With stems enabled, the selected bank controls Vocals, Harmonics, Drums, then
+bypass on that physical deck. A-D is the default; E-H is an optional saved
+setting in MODS > Controls. The inactive bank keeps its normal hot cues. Screen
+labels, pad LEDs and touch actions follow the selected bank. The audio engine
+retains its internal Drums/Harmonics/Vocals storage order. Both decks stay
+independent while MODS or the inline strip is hidden. Turning stems off restores
+normal pad dispatch, including paired releases for presses already owned by the
+mod.
 
 Touch and pad mute controls share one latch. In the inline strip, tapping a
 stem toggles it and dragging adjusts its level. Both the inline strip and full
@@ -111,8 +113,10 @@ panel show Vocals, Harmonics, Drums. Inline waveform placement uses the same
 widget layout as the labels and touch targets.
 
 `test_pad_order.c` checks the physical A/B/C/D routing against onscreen actions
-on both decks and checks the full-panel order. `test_runtime_controls.c` checks
-touch/pad interoperability, LED colors, scene ownership and display bounds.
+on both decks and checks the full-panel order. Pad-state checks cover both
+banks, inactive-bank hot cues and release ownership across bank changes.
+`test_runtime_controls.c` checks touch/pad interoperability, LED colors, scene
+ownership and display bounds.
 Physical acceptance of each new runtime remains separate from these tests.
 
 ## Spare channel stem EQ
@@ -123,24 +127,29 @@ Centre and clockwise positions retain full volume; turning left fades to zero.
 Each knob picks up the current stem level before it takes control, so enabling,
 resuming, loading a track or using touch controls cannot cause a gain jump.
 
-The mode reads native mixer ADC reports on the XZ. It does not consume computer
-MIDI or depend on a desktop relay. A computer may remain connected. A mapping
-requires a local USB track on its deck and PC selected on its spare mixer channel.
-LINK/PC-deck sources, unknown sources and external channel inputs suspend control.
-Suspension leaves the current stem levels unchanged and resets knob pickup.
+The mode reads the XZ's ordinary mixer MIDI reports inside the player and passes
+them through unchanged. It does not need a DJ application mapping or desktop
+relay. The XZ Utility's Mixer MIDI Message must be set to Send or Send with Time
+Param. A mapping requires a local USB track on its deck and PC selected on its
+spare mixer channel. LINK/PC-deck sources, unknown sources and external channel
+inputs suspend control. The UI remains Waiting until a valid mixer report
+arrives. Suspension leaves the current stem levels unchanged and resets knob
+pickup.
 
-The firmware 1.26 adapter uses the native mixer volume-report request and its
-explicit exit command. The source/input guards, request lifecycle and normal
-input passthrough are tested independently. Physical acceptance and cold boot
-remain separate checks for each released runtime.
+The firmware 1.26 adapter hooks the normal MIDI CC dispatch path. It does not
+request the factory volume-test mode, which changes audio routing. Source and
+input guards, telemetry mapping, stock MIDI passthrough and refusal when the
+guarded hook is unavailable are covered by isolated checks. Physical audio
+acceptance and cold boot remain separate checks for each released runtime.
 
 ## Enter and leave the VJ.Tools view
 
-The top-left button is always available with MODS closed. It reads VJ.Tools
-on the native screen and Exit VJ while the stream view is enabled. The physical
-shortcut assignment is optional and does not hide this button. Exiting keeps
-incoming frames from taking over until the user opens the view again. View
-choice is saved when the settings USB is writable.
+The top-left VJ.Tools button appears only while the network connection is live.
+It reads VJ.Tools on the native screen and Exit VJ while the stream view is
+enabled. The full VJ.Tools settings page stays in MODS even when the network is
+offline. The physical shortcut assignment is optional. Exiting keeps incoming
+frames from taking over until the user opens the view again. View choice is
+saved when the settings USB is writable.
 
 Native-view touches stay native; streamed-view touches go to the desktop.
 A gesture keeps its owner until release even when it crosses the view button

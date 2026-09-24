@@ -22,6 +22,7 @@ static int badge(const struct xz_native_touch*t,const struct xz_touch_status*s) 
         s->x<(uint32_t)(t->badge_x+t->badge_w)&&s->y<(uint32_t)(t->badge_y+t->badge_h);
 }
 static int vj_btn(const struct xz_native_touch*t,const struct xz_touch_status*s) {
+ if(!t->model||!t->model->connection.connected)return 0;
  return s->x>=(uint32_t)t->vj_btn_x&&s->y>=(uint32_t)t->vj_btn_y&&
         s->x<(uint32_t)(t->vj_btn_x+t->vj_btn_w)&&s->y<(uint32_t)(t->vj_btn_y+t->vj_btn_h);
 }

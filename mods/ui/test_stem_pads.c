@@ -55,5 +55,19 @@ int main(void) {
         e.shift=1;
         assert(!xz_stem_control_event(&s,&e,1,0,1,&toggle));
     }
-    puts("PASS pad mapping, all pages, Shift page buttons, repeat and release ownership");
+    for(int bank=0;bank<2;bank++)for(int deck=0;deck<2;deck++)for(int pad=0;pad<8;pad++){
+        s=(struct xz_stem_pads){0};s.bank=bank;
+        e=(struct xz_cue_event){deck,pad,0,1,0,0,0,-1,0};
+        int slot=pad-bank*4,expected=slot>=0&&slot<4;
+        assert(xz_stem_pad_event(&s,&e,1,&toggle)==expected);
+        assert(toggle==(expected?(slot<3?2-slot:3):-1));
+        s.bank=1-bank;e.operation=2;
+        assert(xz_stem_pad_event(&s,&e,1,&toggle)==expected);
+    }
+    s=(struct xz_stem_pads){0};s.bank=1;
+    e=(struct xz_cue_event){0,0,0,1,0,0,0,-1,0};
+    assert(!xz_stem_pad_event(&s,&e,1,&toggle));s.bank=0;
+    assert(!xz_stem_pad_event(&s,&e,1,&toggle));e.operation=2;
+    assert(!xz_stem_pad_event(&s,&e,1,&toggle));
+    puts("PASS A-D/E-H banks, inactive-bank hot cues, deck independence and release ownership across bank changes");
 }

@@ -6,8 +6,9 @@ int xz_stem_control_event(struct xz_stem_pads *s, const struct xz_cue_event *e, 
     int action = e->pad;
     int is_page = e->mode_button >= 0 && e->mode_button < 4;
     if (is_page) action = e->mode_button;
-    if (action < 0 || action > 3) return 0;
+    if (action < 0 || action > (is_page ? 3 : 7)) return 0;
     unsigned bit = 1u << (action + (is_page ? 8 : 0));
+    if (!is_page) action -= s->bank == 1 ? 4 : 0;
     unsigned *down = &s->down[e->deck], *owned = &s->owned[e->deck];
     int consumed = !!(*owned & bit);
     if (e->operation == 2 || e->operation == 3) {
@@ -17,6 +18,7 @@ int xz_stem_control_event(struct xz_stem_pads *s, const struct xz_cue_event *e, 
     if (e->operation != 0) return consumed;
     if (*down & bit) return consumed;
     *down |= bit;
+    if (action < 0 || action > 3) return 0;
     if (!active || (is_page ? !shift_pages || !e->shift : e->pad_page != selected_page || e->shift)) return 0;
     *owned |= bit;
     *toggle = action < 3 ? xz_stem_for_pad(action) : action;
