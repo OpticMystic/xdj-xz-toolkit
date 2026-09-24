@@ -144,7 +144,7 @@ acceptance and cold boot remain separate checks for each released runtime.
 
 ## Enter and leave the VJ.Tools view
 
-The top-left VJ.Tools button appears only while the MODS VJ CONNECTION setting
+The top-left VJ.Tools button appears only while the MODS VJ.TOOLS CONNECTION setting
 is enabled and the network connection is live.
 It reads VJ.Tools on the native screen and Exit VJ while the stream view is
 enabled. The full VJ.Tools settings page stays in MODS even when the network is
