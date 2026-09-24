@@ -14,6 +14,9 @@ int xz_native_focus_deck(void){return fixture_focus;}
 int xz_native_inline_active(void){return native_active;}
 int xz_native_inline_start(int(*on)(void),xz_native_wave_render draw,void *context){(void)on;(void)draw;(void)context;return 0;}
 int xz_hook_arm(uint32_t a,const unsigned char g[8],void *r,void **o){(void)a;(void)g;(void)r;(void)o;return 0;}
+int xz_native_eq_start(xz_eq_callback callback){(void)callback;return 0;}
+void xz_native_eq_enable(int enabled){(void)enabled;}
+void xz_native_eq_stop(void){}
 int xz_native_led_start(void){return 0;}
 void xz_native_led_stop(void){}
 void xz_log(const char *s){(void)s;}
@@ -45,10 +48,10 @@ int main(void){
     int cached=render_inline(NULL,pixels+1,count,536,536,64);pthread_mutex_unlock(&ui_mutex);
     assert(cached&&!memcmp(saved,pixels+1,count*sizeof(*saved)));free(saved);
     model.stem_page=1;model.pad_feedback=1;
-    struct xz_cue_event e={0};e.deck=0;e.pad=2;e.mode_button=-1;e.pad_page=0;e.hotcue_mode=1;
+    struct xz_cue_event e={0};e.deck=0;e.pad=0;e.mode_button=-1;e.pad_page=0;e.hotcue_mode=1;
     unsigned flags,rgb;int lit;
     assert(xz_ui_runtime_pad(&e,&flags));assert(applied[0].vocals==0);
-    assert(xz_ui_runtime_pad_color(0,2,&rgb,&lit)&&rgb==xz_ui_stem_color(model.theme,2)&&!lit);
+    assert(xz_ui_runtime_pad_color(0,0,&rgb,&lit)&&rgb==xz_ui_stem_color(model.theme,2)&&!lit);
     e.operation=2;assert(xz_ui_runtime_pad(&e,&flags));
     struct xz_ui_action action={0};action.kind=XZ_UI_MUTE;action.deck=0;action.index=2;action.phase=XZ_UI_PRESS;
     apply(NULL,&action,1);assert(applied[0].vocals==1);
@@ -76,5 +79,21 @@ int main(void){
     model.enabled=0;e.operation=0;assert(!xz_ui_runtime_pad(&e,&flags));
     e.operation=2;assert(!xz_ui_runtime_pad(&e,&flags));model.enabled=XZ_UI_STEM;
     touch.visible=1;assert(!render_inline(NULL,pixels+1,count,536,536,64));free(pixels);
-    puts("PASS runtime stem tap toggles, deck selection, drag ownership, native-wave mapping and bounded rendering");return 0;
+    memset(eq_pickup,0,sizeof(eq_pickup));memset(eq_revision,0,sizeof(eq_revision));
+    model.deck[0].muted=0;model.deck[0].bypass=0;model.deck[0].levels[2]=1;
+    struct xz_eq_snapshot eq={0};eq.status=XZ_EQ_ACTIVE;eq.allowed=1;eq.revision[0][2]=1;
+    mixer_eq_update(&eq);assert(model.deck[0].levels[2]==1);
+    eq.revision[0][2]++;eq.gain[0][2]=1;mixer_eq_update(&eq);
+    eq.revision[0][2]++;eq.gain[0][2]=.4f;mixer_eq_update(&eq);assert(applied[0].vocals==.4f);
+    eq.allowed=0;eq.revision[0][2]++;eq.gain[0][2]=0;mixer_eq_update(&eq);assert(applied[0].vocals==.4f);
+    eq.allowed=1;mixer_eq_update(&eq);assert(applied[0].vocals==.4f);
+    eq.revision[0][2]++;eq.gain[0][2]=1;mixer_eq_update(&eq);assert(applied[0].vocals==.4f);
+    eq.revision[0][2]++;eq.gain[0][2]=.2f;mixer_eq_update(&eq);assert(applied[0].vocals==.2f);
+    touch.visible=0;model.connection.connected=1;model.fb_takeover=1;
+    int native_before=stock_calls;
+    contact(self,350,350,1);contact(self,350,350,0);assert(stock_calls==native_before);
+    contact(self,40,10,1);contact(self,40,10,0);assert(!model.fb_takeover);
+    contact(self,350,350,1);contact(self,350,350,0);assert(stock_calls>native_before);
+    contact(self,40,10,1);contact(self,40,10,0);assert(model.fb_takeover);
+    puts("PASS runtime stem controls, EQ pickup, VJ exit/reopen and view-owned touch routing");return 0;
 }

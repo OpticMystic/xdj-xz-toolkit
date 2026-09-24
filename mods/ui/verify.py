@@ -12,6 +12,9 @@ common = [str(Path(args.zig).resolve()), 'cc', '-O2', '-std=c11', '-Wall', '-Wex
 with tempfile.TemporaryDirectory(prefix='xz-ui-test-') as folder:
     for name, sources in {
         'pads': ['stem_pads.c', 'test_stem_pads.c'],
+        'pad-order': ['ui.c', 'stem_pads.c', 'test_pad_order.c'],
+        'mixer-eq': ['mixer_eq.c', 'test_mixer_eq.c'],
+        'native-mixer-eq': ['mixer_eq.c', 'test_native_mixer_eq.c'],
         'ui': ['ui.c', 'test_ui.c'],
         'touch': ['ui.c', 'native_touch.c', 'test_native_touch.c'],
         'wave': ['wave_viewport.c', 'test_wave_viewport.c'],

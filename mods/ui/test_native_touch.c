@@ -35,29 +35,25 @@ int main(void) {
  s.x=760;s.y=10;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
  assert(!touch.visible&&!touch.capture&&solver.previous.down);
  s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
-  /* Top-left VJ button touch when not assigned to onscreen passes through to stock */
-  model.takeover_assign=0;
-  s=(struct xz_touch_status){1,{0,0,0},40,10};
-  int prev_calls=solver.calls;
-  xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
-  assert(solver.calls==prev_calls+1&&!touch.visible&&!touch.capture);
-  s.down=0;
-  xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
-
-  /* Top-left VJ button touch when assigned to onscreen intercepts and emits XZ_UI_TAKEOVER_TOGGLE */
-  touch.apply=test_apply;
-  model.takeover_assign=2;
-  memset(&last_act,0,sizeof(last_act));
-  s=(struct xz_touch_status){1,{0,0,0},40,10};
-  prev_calls=solver.calls;
+ touch.apply=test_apply;
+ for(int assignment=0;assignment<3;assignment++){
+  model.takeover_assign=assignment;memset(&last_act,0,sizeof(last_act));
+  s=(struct xz_touch_status){1,{0,0,0},40,10};int prev_calls=solver.calls;
   assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
-  assert(solver.calls==prev_calls&&!touch.visible&&touch.capture);
-  assert(last_act.kind==XZ_UI_TAKEOVER_TOGGLE);
-  s.down=0;
-  assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
-  assert(!touch.capture);
-  touch.apply=NULL;
-  model.takeover_assign=0;
+  assert(solver.calls==prev_calls&&!touch.visible&&touch.capture&&last_act.kind==XZ_UI_TAKEOVER_TOGGLE);
+  s.x=400;s.y=300;assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));
+  s.down=0;assert(xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(!touch.capture);
+ }
+ touch.apply=NULL;model.takeover_assign=0;
+ model.fb_takeover=1;model.connection.connected=1;int untouched=solver.calls;
+ s=(struct xz_touch_status){1,{0,0,0},350,300};
+ assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(touch.vj_contact&&solver.calls==untouched);
+ s.x=40;s.y=10;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(!touch.capture&&solver.calls==untouched);
+ model.fb_takeover=0;s.x=400;s.y=350;
+ assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(solver.calls==untouched);
+ s.down=0;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(!touch.vj_contact&&solver.calls==untouched);
+ s.down=1;assert(!xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock));assert(solver.calls==untouched+1);
+ s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);model.connection.connected=0;
  /* Inline region uses fixture coordinates, not a claimed native layout. */
  struct xz_touch_region r={120,220,500,60};
  assert(xz_native_touch_region(&touch,&r));

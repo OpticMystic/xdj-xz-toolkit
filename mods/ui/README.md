@@ -96,20 +96,52 @@ The connection demo has no reported receiver and never invents a live connection
 Host rendering and ARM object
 compilation passed. DirectFB presentation, physical touch routing, audio actions
 and complete stock-screen recoloring remain separate runtime acceptance gates.
-# Physical stem pads
+## Physical stem pads
 
-With stems enabled, open STEMS / GC and select deck 1 or 2. In that deck's
-HOT CUE mode, A toggles drums, B harmonics, C vocals, and D bypass. Mutes latch
-until pressed again and remain in effect when the panel closes. A held
-touchscreen mute is independent of the pad latch. E-H retain normal hot cues.
-Closing the panel restores normal pad dispatch after any owned press releases.
-Pads on the other deck retain normal behavior.
+With stems enabled, HOT CUE A toggles Vocals, B Harmonics, C Drums, and D
+bypass on that physical deck. The screen and pad LED colors use that same order.
+The audio engine retains its internal Drums/Harmonics/Vocals storage order.
+Both decks stay independent while MODS or the inline strip is hidden. E-H
+retain their normal hot cues. Turning stems off restores normal pad dispatch,
+including paired releases for presses already owned by the mod.
 
-Run `python ui/verify.py --zig <zig>` from the mods directory for portable
-control, touch and rendering checks. Physical pad acceptance is still required
-for the new build. Pad LEDs are not yet connected to stem state.
+Touch and pad mute controls share one latch. In the inline strip, tapping a
+stem toggles it and dragging adjusts its level. Both the inline strip and full
+panel show Vocals, Harmonics, Drums. Inline waveform placement uses the same
+widget layout as the labels and touch targets.
 
-The current panel is full-screen. Normal USB playback integration remains in
-progress; see `NATIVE_LAYOUT.md` for the grounded native layout functions and
-the missing waveform reflow contract. `capture_native_screen.py <new-dir>`
-captures a framebuffer and raw native state without modifying the application.
+`test_pad_order.c` checks the physical A/B/C/D routing against onscreen actions
+on both decks and checks the full-panel order. `test_runtime_controls.c` checks
+touch/pad interoperability, LED colors, scene ownership and display bounds.
+Physical acceptance of each new runtime remains separate from these tests.
+
+## Spare channel stem EQ
+
+In MODS > Controls, enable Spare Channel Stem EQ. Channel 3 controls Deck 1
+and channel 4 controls Deck 2. HIGH controls Vocals, MID Harmonics, LOW Drums.
+Centre and clockwise positions retain full volume; turning left fades to zero.
+Each knob picks up the current stem level before it takes control, so enabling,
+resuming, loading a track or using touch controls cannot cause a gain jump.
+
+The mode reads native mixer ADC reports on the XZ. It does not consume computer
+MIDI or depend on a desktop relay. A computer may remain connected. A mapping
+requires a local USB track on its deck and PC selected on its spare mixer channel.
+LINK/PC-deck sources, unknown sources and external channel inputs suspend control.
+Suspension leaves the current stem levels unchanged and resets knob pickup.
+
+The firmware 1.26 adapter uses the native mixer volume-report request and its
+explicit exit command. The source/input guards, request lifecycle and normal
+input passthrough are tested independently. Physical acceptance and cold boot
+remain separate checks for each released runtime.
+
+## Enter and leave the VJ.Tools view
+
+The top-left button is always available with MODS closed. It reads VJ.Tools
+on the native screen and Exit VJ while the stream view is enabled. The physical
+shortcut assignment is optional and does not hide this button. Exiting keeps
+incoming frames from taking over until the user opens the view again. View
+choice is saved when the settings USB is writable.
+
+Native-view touches stay native; streamed-view touches go to the desktop.
+A gesture keeps its owner until release even when it crosses the view button
+or a source shortcut changes the view.

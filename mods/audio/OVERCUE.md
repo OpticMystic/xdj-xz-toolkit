@@ -37,7 +37,7 @@ touches use the inverse coordinate mapping. Captured strip gestures cannot leak
 into stock controls, and a track change resets gains and cancels old gestures.
 
 The STEMS button next to MODS toggles strip visibility without changing audio or
-pad ownership. With stems enabled, HOT CUE A/B/C toggle Drums/Harmonics/Vocal,
+pad ownership. With stems enabled, HOT CUE A/B/C toggle Vocal/Harmonics/Drums,
 and D toggles bypass on that physical deck. The configured additional pad page
 also works. Either deck remains independent of panel visibility and displayed
 deck. Turning the audio STEMS setting off restores normal cue dispatch.
@@ -67,3 +67,5 @@ python3 mods/ui/verify_runtime_controls.py
 The prepared audio is a development adapter. Portable tests and isolated ARM
 tests do not establish real-song alignment, audible stem separation, seek
 continuity, or physical inline-display acceptance. Record those separately.
+
+The optional spare-channel EQ mode uses local mixer ADC reports and the same stem gain path. It follows the USB source and external-channel lockouts described in `../ui/README.md`.

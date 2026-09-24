@@ -19,8 +19,8 @@ int xz_stem_control_event(struct xz_stem_pads *s, const struct xz_cue_event *e, 
     *down |= bit;
     if (!active || (is_page ? !shift_pages || !e->shift : e->pad_page != selected_page || e->shift)) return 0;
     *owned |= bit;
-    *toggle = action;
-    if (action < 3) s->muted[e->deck] ^= 1u << action;
+    *toggle = action < 3 ? xz_stem_for_pad(action) : action;
+    if (action < 3) s->muted[e->deck] ^= 1u << *toggle;
     return 1;
 }
 int xz_stem_pad_event(struct xz_stem_pads *s, const struct xz_cue_event *e, int active, int *toggle) {

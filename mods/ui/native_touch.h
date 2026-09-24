@@ -13,6 +13,7 @@ struct xz_native_touch {
  int visible,capture,opening_contact;
  int badge_x,badge_y,badge_w,badge_h;
  int vj_btn_x,vj_btn_y,vj_btn_w,vj_btn_h;
+ int vj_contact;
  int region_x,region_y,region_w,region_h,regional;
 };
 void xz_native_touch_init(struct xz_native_touch *,struct xz_ui *,const struct xz_ui_model *,xz_touch_actions,void *);

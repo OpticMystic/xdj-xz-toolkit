@@ -10,7 +10,7 @@ enum xz_takeover_assign {
 };
 struct xz_settings {
     int stems, gate, smart, theme, stem_page, shift_pages, pad_feedback, shift_keysync;
-    int fb_takeover, takeover_assign;
+    int fb_takeover, takeover_assign, spare_eq;
 };
 void xz_settings_default(struct xz_settings *);
 int xz_settings_parse(const char *, struct xz_settings *);

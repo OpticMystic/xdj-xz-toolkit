@@ -13,9 +13,9 @@ int main(void) {
     for(int theme=0;theme<7;theme++) {
         m.theme=theme;assert(xz_ui_inline_render(&u,&m,frame,540*60,540,536,60));
         for(int col=0;col<3;col++){
-            const int order[3]={2,0,1};unsigned c=xz_ui_stem_color(theme,order[col]);
+            unsigned c=xz_ui_stem_color(theme,2-col);
             uint16_t expected=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x7e0)|((c>>3)&31));
-            int x=100+436*col/3;assert(frame[2*540+x]==expected);
+            int x=42+436*col/3;assert(frame[2*540+x]==expected);
             m.deck[0].muted=7;assert(xz_ui_inline_render(&u,&m,frame,540*60,540,536,60));
             assert(frame[2*540+x]==expected);m.deck[0].muted=0;
         }
@@ -31,9 +31,9 @@ int main(void) {
     assert(a[0].kind==XZ_UI_LEVEL&&a[0].deck==1&&a[0].value>0&&a[0].value<1);
     assert(xz_ui_inline_touch(&u,&m,536,60,900,40,1,a)==1&&a[0].value==1);
     assert(xz_ui_inline_touch(&u,&m,536,60,900,40,0,a)==0);
-    assert(xz_ui_inline_touch(&u,&m,536,60,50,10,1,a)==1);
+    assert(xz_ui_inline_touch(&u,&m,536,60,510,10,1,a)==1);
     assert(a[0].kind==XZ_UI_BYPASS&&a[0].value==1);
-    xz_ui_inline_touch(&u,&m,536,60,50,10,0,a);
+    xz_ui_inline_touch(&u,&m,536,60,510,10,0,a);
     assert(xz_ui_inline_touch(&u,&m,536,60,10,10,1,a)==1);
     assert(a[0].kind==XZ_UI_DECK&&a[0].deck==1&&a[0].index==0&&u.deck==0);
     xz_ui_inline_touch(&u,&m,536,60,10,10,0,a);

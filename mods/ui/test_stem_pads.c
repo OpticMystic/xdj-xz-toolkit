@@ -8,12 +8,12 @@ int main(void) {
     struct xz_stem_pads s = {0};
     struct xz_cue_event e = {0, 0, 0, 1, 0, 0, 0, -1, 0};
     int toggle;
-    assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == 0 && s.muted[0] == 1);
-    assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == -1 && s.muted[0] == 1);
+    assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == 2 && s.muted[0] == 4);
+    assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == -1 && s.muted[0] == 4);
     e.operation = 1;
     assert(xz_stem_pad_event(&s, &e, 0, &toggle));
     e.operation = 2; e.hotcue_mode = 0;
-    assert(xz_stem_pad_event(&s, &e, 0, &toggle) && s.owned[0] == 0 && s.muted[0] == 1);
+    assert(xz_stem_pad_event(&s, &e, 0, &toggle) && s.owned[0] == 0 && s.muted[0] == 4);
     e.operation = 0; e.hotcue_mode = 1;
     assert(xz_stem_pad_event(&s, &e, 1, &toggle) && s.muted[0] == 0);
     e.operation = 3;
@@ -27,7 +27,7 @@ int main(void) {
     for (int deck = 0; deck < 2; deck++) for (int pad = 0; pad < 4; pad++) {
         e = (struct xz_cue_event){deck, pad, 0, 1, 0, 0, 0, -1, 0};
         unsigned other = s.muted[1-deck];
-        assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == pad);
+        assert(xz_stem_pad_event(&s, &e, 1, &toggle) && toggle == (pad<3?2-pad:3));
         assert(s.muted[1-deck] == other);
         e.operation = 3;
         assert(xz_stem_pad_event(&s, &e, 0, &toggle));
@@ -43,11 +43,11 @@ int main(void) {
     for (int page=0;page<4;page++) {
         s=(struct xz_stem_pads){0};
         e=(struct xz_cue_event){0,0,0,page==0,0,page,0,-1,0};
-        assert(xz_stem_control_event(&s,&e,1,page,0,&toggle) && toggle==0);
+        assert(xz_stem_control_event(&s,&e,1,page,0,&toggle) && toggle==2);
         e.operation=2; e.pad_page=-1;
         assert(xz_stem_control_event(&s,&e,0,page,0,&toggle));
         e=(struct xz_cue_event){0,-1,0,0,0,-1,1,page,0};
-        assert(xz_stem_control_event(&s,&e,1,0,1,&toggle) && toggle==page);
+        assert(xz_stem_control_event(&s,&e,1,0,1,&toggle) && toggle==(page<3?2-page:3));
         e.operation=2;e.shift=0;
         assert(xz_stem_control_event(&s,&e,0,0,0,&toggle));
         e.operation=0;

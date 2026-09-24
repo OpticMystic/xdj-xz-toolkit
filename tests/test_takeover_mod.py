@@ -54,13 +54,18 @@ class TakeoverModTests(unittest.TestCase):
         self.assertIn("int fb_takeover, takeover_assign, stems_overlay;", ui_h)
         self.assertIn("void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active);", ui_h)
 
+    def test_mixer_receive_hook_is_in_runtime_allowlist(self):
+        runtime = (MODS / "runtime.c").read_text(encoding="utf-8")
+        self.assertIn("address == 0x25d7f4 ? mixer_receive_guard", runtime)
+        self.assertIn("mixer_receive_guard[8] = {0x40,0x32,0xd0,0xe5,0xf0,0x47,0x2d,0xe9}", runtime)
+
     def test_native_touch_vj_button_interception(self):
         touch_h = (MODS / "ui/native_touch.h").read_text(encoding="utf-8")
         self.assertIn("int vj_btn_x,vj_btn_y,vj_btn_w,vj_btn_h;", touch_h)
 
         touch_c = (MODS / "ui/native_touch.c").read_text(encoding="utf-8")
-        self.assertIn("t->vj_btn_x=0;t->vj_btn_y=0;t->vj_btn_w=80;t->vj_btn_h=24;", touch_c)
-        self.assertIn("takeover_assign==XZ_TAKEOVER_ONSCREEN&&vj_btn(t,s)", touch_c)
+        self.assertIn("t->vj_btn_x=0;t->vj_btn_y=0;t->vj_btn_w=112;t->vj_btn_h=24;", touch_c)
+        self.assertIn("t->model&&vj_btn(t,s)", touch_c)
         self.assertIn("act={.kind=XZ_UI_TAKEOVER_TOGGLE}", touch_c)
 
     def test_ui_runtime_bridge_and_hooks(self):

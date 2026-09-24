@@ -1,4 +1,6 @@
 #include "ui.h"
+#include "stem_pads.h"
+#include "native_mixer_eq.h"
 #include "font_atlas.h"
 #include <stdio.h>
 #include <string.h>
@@ -99,8 +101,8 @@ void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active){
  if(!pixels||stride<800)return;
  struct canvas c={pixels,stride,800,480};
  uint32_t border_col=takeover_active?0x52d794:0xa8ceff;
- rect(c,0,0,80,24,0x15191e);border(c,0,0,80,24,border_col);
- text(c,7,5,"VJ.TOOLS",2,8,takeover_active?0x52d794:0xf4f5f6);
+ rect(c,0,0,112,24,0x15191e);border(c,0,0,112,24,border_col);
+ text(c,7,5,takeover_active?"EXIT VJ":"VJ.TOOLS",2,8,takeover_active?0x52d794:0xf4f5f6);
 }
 static void add(struct xz_ui_widget *w,size_t *n,int x,int y,int width,int height,
  enum xz_ui_action_kind kind,int index,uint32_t cap,const char *label){
@@ -119,8 +121,8 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
  if(u->page==XZ_UI_STEMS){
   add(w,&n,12,224,98,52,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
   for(i=0;i<3;i++){
-   add(w,&n,122+i*224,224,212,38,XZ_UI_MUTE,i,XZ_UI_STEM,stems[i]);
-   add(w,&n,122+i*224,266,212,42,XZ_UI_LEVEL,i,XZ_UI_STEM,"");
+   add(w,&n,122+i*224,224,212,38,XZ_UI_MUTE,xz_stem_for_pad(i),XZ_UI_STEM,stems[xz_stem_for_pad(i)]);
+   add(w,&n,122+i*224,266,212,42,XZ_UI_LEVEL,xz_stem_for_pad(i),XZ_UI_STEM,"");
   }
   for(i=0;i<8;i++){
    int assigned=(m->deck[u->deck].groove_assigned&(1u<<i))!=0;
@@ -149,10 +151,11 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
   add(w,&n,12,250,376,48,XZ_UI_SHIFT_PAGES,0,0,"SHIFT + PAGE BUTTONS");
   add(w,&n,12,308,376,48,XZ_UI_PAD_FEEDBACK,0,0,"PAD COLOR FEEDBACK");
   add(w,&n,12,366,376,48,XZ_UI_SHIFT_KEYSYNC,0,0,"SHIFT + SYNC");
+  add(w,&n,406,250,382,48,XZ_UI_SPARE_EQ,0,0,"SPARE CHANNEL STEM EQ");
  }else if(u->page==XZ_UI_THEMES){
   for(i=0;i<7;i++)add(w,&n,12+(i%3)*262,158+(i/3)*88,252,72,XZ_UI_SET_THEME,i,XZ_UI_THEME,themes[i]);
  }else if(u->page==XZ_UI_CONNECTION){
-  add(w,&n,492,142,296,42,XZ_UI_TAKEOVER_TOGGLE,0,0,"FB TAKEOVER");
+  add(w,&n,492,142,296,42,XZ_UI_TAKEOVER_TOGGLE,0,0,"VJ.TOOLS VIEW");
   add(w,&n,492,238,94,40,XZ_UI_TAKEOVER_ASSIGN,0,0,"LINK");
   add(w,&n,592,238,96,40,XZ_UI_TAKEOVER_ASSIGN,1,0,"REKORDBOX");
   add(w,&n,694,238,94,40,XZ_UI_TAKEOVER_ASSIGN,2,0,"ONSCREEN");
@@ -163,6 +166,7 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
 }
 static int ready(const struct xz_ui_model *m,int deck,const struct xz_ui_widget *w){
  const struct xz_ui_deck *d=&m->deck[deck];
+ if(w->kind==XZ_UI_SPARE_EQ)return m->eq_available||m->spare_eq;
  if(w->kind==XZ_UI_CONNECTION_ENABLE)return m->connection.ready&&m->connection.can_enable;
  if(w->kind==XZ_UI_DISCOVERY)return m->connection.ready&&m->connection.can_discover;
  uint32_t available=d->ready;
@@ -194,6 +198,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(a.kind==XZ_UI_SHIFT_PAGES)selected=m->shift_pages;
   if(a.kind==XZ_UI_PAD_FEEDBACK)selected=m->pad_feedback;
   if(a.kind==XZ_UI_SHIFT_KEYSYNC)selected=m->shift_keysync;
+  if(a.kind==XZ_UI_SPARE_EQ)selected=m->spare_eq;
   if(a.kind==XZ_UI_TAKEOVER_TOGGLE){color=0x52d794;selected=m->fb_takeover!=0;}
   if(a.kind==XZ_UI_TAKEOVER_ASSIGN)selected=a.index==m->takeover_assign;
   if(a.kind==XZ_UI_BYPASS)selected=d->bypass;
@@ -244,7 +249,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
     rect(c,a.x+a.w-63,a.y+10,55,17,p->alarm);
     text(c,a.x+a.w-58,a.y+13,"MUTED",1,9,p->bg);
    }
-   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE)
+   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE||a.kind==XZ_UI_SPARE_EQ)
     text(c,a.x+a.w-40,a.y+18,selected?"ON":"OFF",1,6,selected?p->accent:dim);
    if(a.kind==XZ_UI_ENABLE)text(c,a.x+a.w-78,a.y+16,!available?"NOT READY":selected?"ON":"OFF",1,12,available&&selected?p->accent:dim);
    if(a.kind==XZ_UI_CONNECTION_ENABLE||a.kind==XZ_UI_DISCOVERY)
@@ -266,18 +271,18 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   rect(c,12,197,776,1,blend(p->bg,p->ink,40));
   if(d->wave_peaks&&d->wave_count){size_t j;for(j=0;j<d->wave_count&&j<388;j++){int x=12+(int)(j*776/d->wave_count);int h=d->wave_peaks[j]*40/255;rect(c,x,198-h/2,2,h,p->accent);}}
   else {rect(c,295,186,212,22,p->bg);text(c,306,191,"WAVEFORM NOT AVAILABLE",1,35,dim);}
-  if(u->page==XZ_UI_STEMS){text(c,12,317,"GROOVE CIRCUIT",2,28,p->ink);text(c,190,322,"BANK A-H",1,20,dim);text(c,12,338,"TAP TO REPLACE A STEM / TAP AGAIN TO RELEASE",1,100,dim);snprintf(buf,sizeof(buf),"%s%s    A DRUMS    B HARMONICS    C VOCALS    D BYPASS",m->stem_page>0?"HOT CUE + ":"",stem_pages[m->stem_page>=0&&m->stem_page<4?m->stem_page:0]);text(c,12,428,buf,1,115,dim);}
+  if(u->page==XZ_UI_STEMS){text(c,12,317,"GROOVE CIRCUIT",2,28,p->ink);text(c,190,322,"BANK A-H",1,20,dim);text(c,12,338,"TAP TO REPLACE A STEM / TAP AGAIN TO RELEASE",1,100,dim);snprintf(buf,sizeof(buf),"%s%s    A VOCALS    B HARMONICS    C DRUMS    D BYPASS",m->stem_page>0?"HOT CUE + ":"",stem_pages[m->stem_page>=0&&m->stem_page<4?m->stem_page:0]);text(c,12,428,buf,1,115,dim);}
   else{snprintf(buf,sizeof(buf),"%s BEATS / %+.1f KEY",lengths[d->loop_index>=0&&d->loop_index<6?d->loop_index:0],(double)d->pitch);text(c,600,279,buf,1,31,p->alarm);text(c,600,357,"VOL / HOLD LATCHES",1,30,dim);text(c,12,372,"SAMPLE BANK A-H / CLOSING X-PAD STOPS SOUND",1,90,dim);}
  }else if(u->page==XZ_UI_SETTINGS){text(c,398,258,"KEY CONTROL",1,62,dim);text(c,398,348,"STEM AND CUE SETTINGS APPLY TO BOTH DECKS",1,62,p->ink);text(c,398,369,"UNAVAILABLE CONTROLS ARE MARKED NOT READY",1,62,dim);}
  else if(u->page==XZ_UI_CONTROLS){
   text(c,12,149,"ADDITIONAL STEMS PAD PAGE",2,40,p->ink);
-  text(c,12,228,"PADS A-D: DRUMS / HARMONICS / VOCALS / BYPASS",1,115,dim);
-  text(c,406,258,"HOLD SHIFT + HOT CUE / BEAT LOOP / SLIP LOOP / BEAT JUMP",1,63,p->ink);
-  text(c,406,279,"TO CONTROL DRUMS / HARMONICS / VOCALS / BYPASS",1,63,dim);
-  text(c,406,316,"MATCH STEM COLORS ON SCREEN",1,63,p->ink);
-  text(c,406,337,"PAD LIGHTS SHOW THE ACTIVE STEM STATE",1,63,dim);
-  text(c,406,374,"KEY SYNC SHORTCUT",1,63,p->ink);
-  text(c,406,395,"OFF BY DEFAULT / REQUIRES KEY SYNC SUPPORT",1,63,dim);
+  text(c,12,228,"PADS A-D: VOCALS / HARMONICS / DRUMS / BYPASS",1,115,dim);
+  text(c,406,311,"CH3 -> DECK 1 / CH4 -> DECK 2",1,63,p->ink);
+  text(c,406,331,"HIGH VOCALS / MID HARMONICS / LOW DRUMS",1,63,dim);
+  const char *eq_status=m->eq_status==XZ_EQ_ACTIVE?"ACTIVE - TURN KNOB THROUGH CURRENT LEVEL":m->eq_status==XZ_EQ_SOURCE?"LOAD USB TRACKS / LINK OR PC SUSPENDS EQ":m->eq_status==XZ_EQ_EXTERNAL?"SUSPENDED: SELECT PC ON SPARE CHANNELS":m->eq_status==XZ_EQ_WAITING?"WAITING FOR MIXER":m->eq_status==XZ_EQ_UNAVAILABLE?"NATIVE EQ INPUT NOT READY":"OFF";
+  text(c,406,353,eq_status,1,63,p->accent);
+  text(c,406,374,"CENTRE = FULL / LEFT = SILENT / NO BOOST",1,63,dim);
+  text(c,406,395,"EXTERNAL INPUTS SUSPEND THEIR STEM CONTROL",1,63,dim);
   text(c,12,430,m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS",1,115,p->ink);
  }
  else if(u->page==XZ_UI_THEMES)text(c,282,361,"ORIGINAL + SIX UPSTREAM THEMES",1,70,dim);
@@ -345,6 +350,7 @@ static size_t touch_widgets(struct xz_ui *u,const struct xz_ui_model *m,int x,in
   case XZ_UI_SHIFT_PAGES:value=m->shift_pages?0:1;break;
   case XZ_UI_PAD_FEEDBACK:value=m->pad_feedback?0:1;break;
   case XZ_UI_SHIFT_KEYSYNC:value=m->shift_keysync?0:1;break;
+  case XZ_UI_SPARE_EQ:value=m->spare_eq?0:1;break;
   case XZ_UI_TAKEOVER_TOGGLE:value=m->fb_takeover?0:1;break;
   case XZ_UI_TAKEOVER_ASSIGN:value=(float)a.index;break;
   case XZ_UI_STEM_PAGE:value=(float)a.index;break;
@@ -359,14 +365,14 @@ size_t xz_ui_touch(struct xz_ui *u,const struct xz_ui_model *m,int x,int y,int d
  size_t count=xz_ui_layout(u,m,w);
  return touch_widgets(u,m,x,y,down,out,w,count);
 }
-static size_t inline_layout(const struct xz_ui *u,int width,int height,struct xz_ui_widget *w){
+size_t xz_ui_inline_layout(const struct xz_ui *u,int width,int height,struct xz_ui_widget *w){
  size_t n=0;
  if(width<400||width>800||height<48||height>96||u->deck<0||u->deck>1)return 0;
  add(w,&n,0,2,40,height-4,XZ_UI_DECK,1-u->deck,0,u->deck?"D2":"D1");
- add(w,&n,42,2,56,height-4,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
+ add(w,&n,width-56,2,56,height-4,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
  for(int i=0;i<3;i++){
-  const int order[3]={2,0,1};int stem=order[i];
-  int x=100+(width-100)*i/3,end=100+(width-100)*(i+1)/3;
+  int stem=xz_stem_for_pad(i);
+  int x=42+(width-100)*i/3,end=42+(width-100)*(i+1)/3;
   add(w,&n,x,2,end-x-2,height-4,XZ_UI_MUTE,stem,XZ_UI_STEM,stems[stem]);
  }
  return n;
@@ -374,7 +380,7 @@ static size_t inline_layout(const struct xz_ui *u,int width,int height,struct xz
 size_t xz_ui_inline_touch(struct xz_ui *u,const struct xz_ui_model *m,int width,int height,int x,int y,int down,struct xz_ui_action out[XZ_UI_ACTIONS]){
  struct xz_ui_widget w[XZ_UI_WIDGETS];
  if(!u||!m)return 0;
- size_t count=inline_layout(u,width,height,w);
+ size_t count=xz_ui_inline_layout(u,width,height,w);
  if(down&&!u->down)for(size_t i=0;i<count;i++){
   struct xz_ui_widget a=w[i];
   if(a.kind==XZ_UI_MUTE&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h&&ready(m,u->deck,&a)){
@@ -397,7 +403,7 @@ size_t xz_ui_inline_touch(struct xz_ui *u,const struct xz_ui_model *m,int width,
 int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pixels,size_t count,size_t stride,int width,int height){
  struct xz_ui_widget w[XZ_UI_WIDGETS];
  if(!u||!m||!pixels||height<=0||width<=0||stride<(size_t)width||stride>count/(size_t)height)return 0;
- size_t n=inline_layout(u,width,height,w);if(!n)return 0;
+ size_t n=xz_ui_inline_layout(u,width,height,w);if(!n)return 0;
  struct canvas c={pixels,stride,width,height};
  const struct palette *p=&palettes[m->theme>=0&&m->theme<7?m->theme:0];
  const struct xz_ui_deck *d=&m->deck[u->deck];
@@ -413,6 +419,7 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
    rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->stem[a.index],on?150:32));
    border(c,a.x,a.y,a.w,a.h,available?p->stem[a.index]:color);
    text(c,a.x+8,a.y+7,a.label,2,(a.w-16)/12,color);
+   text(c,a.x+a.w-10,a.y+6,pads[2-a.index],1,1,color);
    int bar=(int)((a.w-12)*clampf(muted?0:d->levels[a.index],0,1));
    rect(c,a.x+6,a.y+a.h-8,a.w-12,4,blend(p->bg,p->ink,60));
    if(bar)rect(c,a.x+6,a.y+a.h-8,bar,4,on?p->stem[a.index]:color);

@@ -1,7 +1,7 @@
 # xdj-xz-toolkit
 
 Public XDJ-XZ USB builder inputs and ARM display-hook sources for firmware
-1.26. Version 0.1.1 is a developer preview; final native-player and cold-boot qualification remains pending.
+1.26. Version 0.1.2 is a developer preview; final native-player and cold-boot qualification remains pending.
 
 ## What this is not
 
@@ -75,3 +75,5 @@ See [the format and runtime contract](mods/audio/OVERCUE.md) and
 `builder/build_overcue_check.py` builds the read-only desktop compatibility
 checker from the same decoder. The separation workflow still writes legacy
 stemd caches; it does not export OverCue bundles.
+
+The 0.1.2 preview adds native spare-channel EQ and an always-visible VJ.Tools / Exit VJ toggle. See [the controls contract](mods/ui/README.md) for USB-source lockouts, pickup and the hardware acceptance boundary. Both the standalone builder and Library loader now validate the same paired runtime and its native sources.

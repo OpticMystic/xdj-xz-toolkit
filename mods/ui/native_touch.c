@@ -8,7 +8,7 @@ _Static_assert(offsetof(struct xz_touch_status,y)==8,"XZ touch y offset");
 void xz_native_touch_init(struct xz_native_touch*t,struct xz_ui*ui,const struct xz_ui_model*model,xz_touch_actions apply,void*ctx) {
  memset(t,0,sizeof(*t));t->ui=ui;t->model=model;t->apply=apply;t->context=ctx;
  t->badge_x=744;t->badge_y=0;t->badge_w=56;t->badge_h=24;
- t->vj_btn_x=0;t->vj_btn_y=0;t->vj_btn_w=80;t->vj_btn_h=24;
+ t->vj_btn_x=0;t->vj_btn_y=0;t->vj_btn_w=112;t->vj_btn_h=24;
 }
 void xz_native_touch_visible(struct xz_native_touch*t,int visible) {
  if(t->visible&&!visible) {
@@ -40,6 +40,7 @@ static int region(const struct xz_native_touch*t,const struct xz_touch_status*s)
 int xz_native_touch_dispatch(struct xz_native_touch*t,void*self,const struct xz_touch_status*s,const void*mode,xz_stock_touch stock) {
  struct xz_touch_status previous;struct xz_ui_action out[XZ_UI_ACTIONS];size_t n;
  memcpy(&previous,(const char*)self+4,sizeof(previous));
+ if(t->vj_contact){t->vj_contact=!!s->down;return 0;}
  if(!t->visible&&!t->capture&&s->down&&!previous.down&&s->x>=674&&s->x<742&&s->y<24) {
   t->capture=1;t->opening_contact=1;
   struct xz_ui_action act={.kind=XZ_UI_STEMS_OVERLAY};
@@ -48,12 +49,16 @@ int xz_native_touch_dispatch(struct xz_native_touch*t,void*self,const struct xz_
  if(!t->visible&&!t->capture&&s->down&&!previous.down&&badge(t,s)) {
   t->visible=1;t->capture=1;t->opening_contact=1;
  }
- if(!t->visible&&!t->capture&&s->down&&!previous.down&&t->model&&t->model->takeover_assign==XZ_TAKEOVER_ONSCREEN&&vj_btn(t,s)) {
+ if(!t->visible&&!t->capture&&s->down&&!previous.down&&t->model&&vj_btn(t,s)) {
   t->capture=1;t->opening_contact=1;
   struct xz_ui_action act={.kind=XZ_UI_TAKEOVER_TOGGLE};
   if(t->apply)t->apply(t->context,&act,1);
  }
  if(t->visible&&!t->capture&&(!t->regional||(s->down&&!previous.down&&region(t,s))))t->capture=1;
+ if(!t->capture&&!t->visible&&t->model&&t->model->fb_takeover&&t->model->connection.connected){
+  if(previous.down){previous.down=0;stock(self,&previous,mode);}
+  t->vj_contact=!!s->down;return 0;
+ }
  if(!t->capture) {stock(self,s,mode);return 0;}
  /* End any stock gesture before the panel takes ownership. Native solver handles
     its own area teardown; the shim never modifies its private pointer fields. */
