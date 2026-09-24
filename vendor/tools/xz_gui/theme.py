@@ -33,8 +33,14 @@ def _centered(draw: ImageDraw.ImageDraw, text: str, y: int, font, fill, width: i
     draw.text(((width - (box[2] - box[0])) // 2, y), text, font=font, fill=fill)
 
 
-def make_splash(preferred_font: pathlib.Path | None = None) -> Image.Image:
+def make_splash(preferred_font: pathlib.Path | None = None, logo_path: pathlib.Path | None = None) -> Image.Image:
     image = Image.new("RGB", (800, 480), BLACK)
+    if logo_path is not None:
+        with Image.open(logo_path) as source:
+            supplied = source.convert("RGBA")
+        supplied.thumbnail((448, 448), Image.Resampling.LANCZOS)
+        image.paste(supplied, ((800-supplied.width)//2, (480-supplied.height)//2), supplied)
+        return image
     draw = ImageDraw.Draw(image)
     draw.rectangle((0, 0, 799, 479), outline=AMBER, width=5)
     draw.rounded_rectangle((74, 104, 726, 365), radius=24, outline=AMBER, width=5, fill=(6, 8, 10))
@@ -58,8 +64,8 @@ def make_unloaded_logo(
     supplied.thumbnail((86, 86), Image.Resampling.LANCZOS)
     logo_x = 12 + (86 - supplied.width) // 2
     logo_y = 3 + (86 - supplied.height) // 2
-    image.paste(supplied.convert("RGB"), (logo_x, logo_y))
-    draw.text((112, 13), "VJ.TOOLS", font=_font(36, preferred_font), fill=AMBER)
+    image.paste(supplied, (logo_x, logo_y), supplied)
+    draw.text((112, 13), "XZ MODS", font=_font(36, preferred_font), fill=AMBER)
     draw.text((114, 56), "RAM LOADER ACTIVE", font=_font(18, preferred_font), fill=WHITE)
     return image
 
@@ -72,7 +78,7 @@ def build_theme(
     logo_path: pathlib.Path | None = None,
 ) -> None:
     pack = ImagePack.read(stock_pack_path)
-    splash = make_splash(preferred_font)
+    splash = make_splash(preferred_font, logo_path)
     logo = make_unloaded_logo(preferred_font, logo_path)
     pack.replace(SPLASH_IMAGE_ID, splash)
     pack.replace(UNLOADED_LOGO_IMAGE_ID, logo)

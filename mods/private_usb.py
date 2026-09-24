@@ -27,6 +27,7 @@ def main() -> None:
     parser.add_argument("--build", type=pathlib.Path, required=True)
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--mode", choices=("observer", "experimental"), default="observer")
+    parser.add_argument("--gui-pack", type=pathlib.Path, help="Locally generated GUI pack, bound from RAM by the loader")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output exists; use a new private development directory")
@@ -58,13 +59,17 @@ def main() -> None:
         staging = pathlib.Path(temporary)
         payload = write_runtime_payload(staging, rbp,
                     features=("waveform_color_mode3", "deck_select_gate_not_four_native_players", "vjtools_receiver", "development_mods"),
-                    directfb_hook_path=receiver, mods_runtime_path=runtime, mods_mode=args.mode)
+                    directfb_hook_path=receiver, mods_runtime_path=runtime, mods_mode=args.mode,
+                    gui_pack_path=args.gui_pack)
         notices = staging / "licenses"
         notices.mkdir(exist_ok=True)
         (notices / "Barlow-OFL.txt").write_bytes((ROOT / "ui/fonts/OFL.txt").read_bytes())
         build_autoexec_bin(staging, pending, key)
         structure = verify_autoexec_bin(pending, key)
-        for relative in ("autoexec.sh", "rbp.patched", "mods-mode", "tools/libxz-mods.so", "tools/libxz-directfb-hook.so", "licenses/Barlow-OFL.txt"):
+        roundtrip_files = ["autoexec.sh", "rbp.patched", "mods-mode", "tools/libxz-mods.so", "tools/libxz-directfb-hook.so", "licenses/Barlow-OFL.txt"]
+        if args.gui_pack:
+            roundtrip_files += ["gui/imagedata.dat", "gui/imagedata.dat.md5"]
+        for relative in roundtrip_files:
             actual = extract_autoexec_file(pending, key, "/" + relative)
             if actual != (staging / relative).read_bytes():
                 raise ValueError(f"Encrypted payload round-trip failed: {relative}")
