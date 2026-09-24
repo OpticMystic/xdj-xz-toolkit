@@ -10,7 +10,7 @@
 static uint16_t pixels[XZ_NATIVE_WAVE_PIXELS+8],scratch[XZ_NATIVE_WAVE_PIXELS+8];
 static int calls;
 static int draw(void *context,uint16_t *out,size_t count,size_t stride,int width,int height) {
-    assert(count==536*64&&stride==536&&width==536&&height==64);calls++;
+    assert(count==536*XZ_WAVE_INLINE_HEIGHT&&stride==536&&width==536&&height==XZ_WAVE_INLINE_HEIGHT);calls++;
     for(size_t i=0;i<count;i++)out[i]=0xabcd;
     return *(int *)context;
 }
@@ -28,8 +28,8 @@ int main(void) {
     assert(xz_native_wave_finish(&pair,&s,7,200,scratch,XZ_NATIVE_WAVE_PIXELS,draw,&success));
     assert(!pair.captured&&!pair.pixels&&calls==1);
     for(unsigned y=0;y<268;y++)for(unsigned x=0;x<536;x++){
-        uint16_t expected=(y>=100&&y<132)||(y>=232&&y<264)?0xabcd:
-            y<100||(y>=132&&y<232)?xz_wave_source_row(y,100):0;
+        uint16_t expected=(y>=92&&y<132)||(y>=224&&y<264)?0xabcd:
+            y<92||(y>=132&&y<224)?xz_wave_source_row(y,92):0;
         assert(pixels[y*536+x]==expected);
     }
     for(unsigned i=0;i<8;i++)assert(pixels[XZ_NATIVE_WAVE_PIXELS+i]==0xdead&&scratch[XZ_NATIVE_WAVE_PIXELS+i]==0xdead);

@@ -3,11 +3,12 @@
 #define XZ_NATIVE_WAVE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "wave_viewport.h"
 
 #define XZ_NATIVE_WAVE_PIXELS (536u * 268u)
-#define XZ_NATIVE_WAVE_ROW1_Y 100u
-#define XZ_NATIVE_WAVE_ROW2_Y 232u
-#define XZ_NATIVE_WAVE_ROW_HEIGHT 32u
+#define XZ_NATIVE_WAVE_ROW1_Y XZ_WAVE_LANE_HEIGHT
+#define XZ_NATIVE_WAVE_ROW2_Y (132u + XZ_WAVE_LANE_HEIGHT)
+#define XZ_NATIVE_WAVE_ROW_HEIGHT XZ_WAVE_CONTROL_HEIGHT
 #define XZ_NATIVE_WAVE_ROWS_PIXELS (536u * XZ_NATIVE_WAVE_ROW_HEIGHT * 2u)
 
 /* Values read by the hook adapter from the qualified 1.26 addresses.

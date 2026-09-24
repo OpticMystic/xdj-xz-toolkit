@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "stem_pads.h"
+#include "wave_viewport.h"
 #include <assert.h>
 #include <stdio.h>
 #ifdef NDEBUG
@@ -19,9 +20,9 @@ int main(void) {
             struct xz_stem_pads state={0};
             struct xz_cue_event e={deck,pad,0,1,0,0,0,-1,0};int toggle=-1;
             assert(xz_stem_pad_event(&state,&e,1,&toggle)&&toggle==(pad<3?2-pad:3));
-            int x=pad*134+60,y=deck*32+12;
-            size_t n=xz_ui_inline_touch(&u,&m,536,64,x,y,1,actions);
-            if(!n)n=xz_ui_inline_touch(&u,&m,536,64,x,y,0,actions);
+            int x=pad*134+60,y=deck*XZ_WAVE_CONTROL_HEIGHT+12;
+            size_t n=xz_ui_inline_touch(&u,&m,536,XZ_WAVE_INLINE_HEIGHT,x,y,1,actions);
+            if(!n)n=xz_ui_inline_touch(&u,&m,536,XZ_WAVE_INLINE_HEIGHT,x,y,0,actions);
             assert(n==1);
             if(pad<3){
                 if(actions[0].kind!=XZ_UI_MUTE||actions[0].index!=toggle){

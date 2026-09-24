@@ -122,7 +122,7 @@ Physical acceptance of each new runtime remains separate from these tests.
 ## Two-deck stem controls on the native screen
 
 The 536x268 native waveform window keeps both deck waveforms. It places a
-32-pixel control row immediately after each waveform. Every row has four
+40-pixel control row immediately after each waveform. Every row has four
 buttons in the same order as the physical stem pad bank: Vocals, Harmonics,
 Drums, and Bypass. Eight touch targets stay visible together on the play
 screen, with no deck-switch button.

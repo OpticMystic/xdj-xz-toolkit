@@ -248,12 +248,12 @@ static void refresh(void) {
 static int inline_enabled(void) { return __atomic_load_n(&started,__ATOMIC_ACQUIRE) && __atomic_load_n(&inline_requested,__ATOMIC_ACQUIRE); }
 static int render_inline(void *context,uint16_t *pixels,size_t count,size_t stride,int width,int height) {
     (void)context;
-    static _Thread_local uint16_t cached[536*64];
+    static _Thread_local uint16_t cached[536*XZ_WAVE_INLINE_HEIGHT];
     static _Thread_local int cached_valid;
-    if (!pixels || width!=536 || height!=64 || stride<536 || stride>count/64) return 0;
+    if (!pixels || width!=536 || height!=XZ_WAVE_INLINE_HEIGHT || stride<536 || stride>count/XZ_WAVE_INLINE_HEIGHT) return 0;
     if (pthread_mutex_trylock(&ui_mutex) != 0) {
         if (!cached_valid || !inline_enabled()) return 0;
-        for (int y=0;y<64;y++) memcpy(pixels+y*stride,cached+y*536,536*sizeof(*pixels));
+        for (int y=0;y<XZ_WAVE_INLINE_HEIGHT;y++) memcpy(pixels+y*stride,cached+y*536,536*sizeof(*pixels));
         return 1;
     }
     refresh();
@@ -272,7 +272,7 @@ static int render_inline(void *context,uint16_t *pixels,size_t count,size_t stri
         uint32_t rgb=xz_ui_stem_color(model.theme,(int)role);
         uint16_t color=(uint16_t)(((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31));
         float gain=model.deck[widget.deck].muted&(1u<<role)?0:model.deck[widget.deck].levels[role];
-        int center=widget.y+19;
+        int center=widget.y+24;
         for(size_t x=0;x<n;x++){
             int amplitude=(int)(peaks[x]*gain*3/31);if(amplitude>3)amplitude=3;
             for(int y=center-4;y<=center+4;y++)pixels[(size_t)y*stride+(size_t)left+x]=0;
@@ -282,7 +282,7 @@ static int render_inline(void *context,uint16_t *pixels,size_t count,size_t stri
         for(int y=center-4;y<=center+4;y++)pixels[(size_t)y*stride+(size_t)needle]=0xffff;
     }
     if (result) {
-        for (int y=0;y<64;y++) memcpy(cached+y*536,pixels+y*stride,536*sizeof(*pixels));
+        for (int y=0;y<XZ_WAVE_INLINE_HEIGHT;y++) memcpy(cached+y*536,pixels+y*stride,536*sizeof(*pixels));
         cached_valid=1;
     } else cached_valid=0;
     pthread_mutex_unlock(&ui_mutex);return result;
@@ -361,29 +361,29 @@ static void touch_hook(void *self, const struct xz_touch_status *status, const v
         else if(status->y>=161&&status->y<302)ui.deck=inline_ui.deck=1;
     }
     int active=!touch.visible&&!(model.fb_takeover&&model.connection.connected)&&xz_native_inline_active();
-    int pressed_deck=status->y>=118&&status->y<150?0:status->y>=250&&status->y<282?1:-1;
+    int pressed_deck=status->y>=110&&status->y<150?0:status->y>=242&&status->y<282?1:-1;
     if(active&&!inline_contact&&!previous_down&&status->down&&status->x>=131&&status->x<667&&pressed_deck>=0){
         inline_contact=1;inline_contact_deck=pressed_deck;inline_cancelled=0;
     }
     int owned;
     if(inline_contact){
         struct xz_ui_action actions[XZ_UI_ACTIONS];
-        int row_y=(int)status->y-(inline_contact_deck?250:118);
-        if(row_y<0)row_y=0;else if(row_y>31)row_y=31;
-        size_t n=inline_cancelled?0:xz_ui_inline_touch(&inline_ui,&model,536,64,(int)status->x-131,row_y+inline_contact_deck*32,!!status->down,actions);
+        int row_y=(int)status->y-(inline_contact_deck?242:110);
+        if(row_y<0)row_y=0;else if(row_y>=XZ_WAVE_CONTROL_HEIGHT)row_y=XZ_WAVE_CONTROL_HEIGHT-1;
+        size_t n=inline_cancelled?0:xz_ui_inline_touch(&inline_ui,&model,536,XZ_WAVE_INLINE_HEIGHT,(int)status->x-131,row_y+inline_contact_deck*XZ_WAVE_CONTROL_HEIGHT,!!status->down,actions);
         if(n)apply(NULL,actions,n);
         if(!status->down){inline_contact=0;inline_cancelled=0;}
         owned=1;
     }else{
         if(!previous_down&&status->down){
-            inline_wave_deck=status->y>=18&&status->y<118?0:status->y>=150&&status->y<250?1:-1;
+            inline_wave_deck=status->y>=18&&status->y<110?0:status->y>=150&&status->y<242?1:-1;
             inline_wave_contact=active&&status->x>=131&&status->x<667&&inline_wave_deck>=0;
         }
         struct xz_touch_status mapped=*status;
         if(inline_wave_contact){
             int row=(int)mapped.y-(inline_wave_deck?150:18);
-            if(row<0)row=0;else if(row>99)row=99;
-            mapped.y=18+xz_wave_source_row((unsigned)(row+(inline_wave_deck?132:0)),100);
+            if(row<0)row=0;else if(row>=XZ_WAVE_LANE_HEIGHT)row=XZ_WAVE_LANE_HEIGHT-1;
+            mapped.y=18+xz_wave_source_row((unsigned)(row+(inline_wave_deck?132:0)),XZ_WAVE_LANE_HEIGHT);
         }
         owned=xz_native_touch_dispatch(&touch,self,&mapped,mode,stock_touch);
         if(!status->down)inline_wave_contact=0;

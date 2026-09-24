@@ -39,8 +39,8 @@ int xz_native_wave_finish(struct xz_native_wave_pair *p,const struct xz_native_w
     size_t bytes=XZ_NATIVE_WAVE_PIXELS*sizeof(*scratch);
     if(a>UINTPTR_MAX-bytes || b>UINTPTR_MAX-bytes || (a<b+bytes && b<a+bytes))return 0;
     memcpy(scratch,saved.pixels,bytes);
-    if(!xz_wave_compact(scratch,XZ_NATIVE_WAVE_PIXELS,536,100) ||
-        !render(context,rows,XZ_NATIVE_WAVE_ROWS_PIXELS,536,536,64))return 0;
+    if(!xz_wave_compact(scratch,XZ_NATIVE_WAVE_PIXELS,536,XZ_WAVE_LANE_HEIGHT) ||
+        !render(context,rows,XZ_NATIVE_WAVE_ROWS_PIXELS,536,536,XZ_WAVE_INLINE_HEIGHT))return 0;
     memcpy(scratch+536*XZ_NATIVE_WAVE_ROW1_Y,rows,536*XZ_NATIVE_WAVE_ROW_HEIGHT*sizeof(*rows));
     memcpy(scratch+536*XZ_NATIVE_WAVE_ROW2_Y,rows+536*XZ_NATIVE_WAVE_ROW_HEIGHT,
            536*XZ_NATIVE_WAVE_ROW_HEIGHT*sizeof(*rows));

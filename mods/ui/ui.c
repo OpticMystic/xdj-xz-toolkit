@@ -1,6 +1,7 @@
 #include "ui.h"
 #include "stem_pads.h"
 #include "font_atlas.h"
+#include "wave_viewport.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -365,11 +366,11 @@ size_t xz_ui_touch(struct xz_ui *u,const struct xz_ui_model *m,int x,int y,int d
 }
 size_t xz_ui_inline_layout(const struct xz_ui *u,int width,int height,struct xz_ui_widget w[XZ_UI_WIDGETS]){
  size_t n=0;
- if(width<400||width>800||height!=64||u->deck<0||u->deck>1)return 0;
+ if(width<400||width>800||height!=XZ_WAVE_INLINE_HEIGHT||u->deck<0||u->deck>1)return 0;
  for(int deck=0;deck<2;deck++)for(int slot=0;slot<4;slot++){
   int x=width*slot/4,end=width*(slot+1)/4;
   int stem=slot<3?xz_stem_for_pad(slot):0;
-  add(w,&n,x+1,deck*32+1,end-x-2,30,slot<3?XZ_UI_MUTE:XZ_UI_BYPASS,
+  add(w,&n,x+1,deck*XZ_WAVE_CONTROL_HEIGHT+1,end-x-2,XZ_WAVE_CONTROL_HEIGHT-2,slot<3?XZ_UI_MUTE:XZ_UI_BYPASS,
       stem,XZ_UI_STEM,slot<3?stems[stem]:"BYPASS");
   w[n-1].deck=deck;
  }
@@ -421,14 +422,14 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
    int bar=(int)((a.w-12)*clampf(muted?0:d->levels[a.index],0,1));
    rect(c,a.x+6,a.y+a.h-5,a.w-12,2,blend(p->bg,p->ink,60));
    if(bar)rect(c,a.x+6,a.y+a.h-5,bar,2,on?p->stem[a.index]:color);
-   if(d->stem_loading)text(c,a.x+8,a.y+17,"LOADING",1,(a.w-16)/6,p->alarm);
+   if(d->stem_loading)text(c,a.x+8,a.y+24,"LOADING",1,(a.w-16)/6,p->alarm);
    continue;
   }
   if(d->bypass){rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->alarm,88));border(c,a.x,a.y,a.w,a.h,p->alarm);}
   text(c,a.x+8,a.y+3,a.label,2,(a.w-16)/12,color);
   text(c,a.x+a.w-11,a.y+4,m->stem_bank?"H":"D",1,1,color);
-  text(c,a.x+8,a.y+18,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);
-  text(c,a.x+a.w-29,a.y+18,a.deck?"D2":"D1",1,3,color);
+  text(c,a.x+8,a.y+25,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);
+  text(c,a.x+a.w-29,a.y+25,a.deck?"D2":"D1",1,3,color);
  }
  return 1;
 }

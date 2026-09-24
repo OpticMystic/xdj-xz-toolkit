@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "wave_viewport.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,8 +44,8 @@ int main(int argc,char **argv){
   ui.page=XZ_UI_STEMS;model.deck[0].muted=1;model.deck[0].levels[1]=.7f;
   if(!xz_ui_render(&ui,&model,pixels,800*480,800))return 1;
   snprintf(name,sizeof(name),"theme-%d-muted",theme);save(argv[1],name,800,480);
-  if(!xz_ui_inline_render(&ui,&model,pixels,536*64,536,536,64))return 1;
-  snprintf(name,sizeof(name),"theme-%d-inline",theme);save(argv[1],name,536,64);
+  if(!xz_ui_inline_render(&ui,&model,pixels,536*XZ_WAVE_INLINE_HEIGHT,536,536,XZ_WAVE_INLINE_HEIGHT))return 1;
+  snprintf(name,sizeof(name),"theme-%d-inline",theme);save(argv[1],name,536,XZ_WAVE_INLINE_HEIGHT);
   model.deck[0].muted=0;model.deck[0].levels[1]=1;
  }
  model.theme=0;ui.deck=2;
