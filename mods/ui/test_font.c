@@ -13,7 +13,7 @@ int main(void){
   assert(g->offset+(size_t)g->width*g->height<=sizeof(xz_font_coverage));
   assert(g->advance>0);
  }
- struct xz_ui ui;struct xz_ui_model m={0};xz_ui_init(&ui);
+ struct xz_ui ui;struct xz_ui_model m={0};xz_ui_init(&ui);ui.page=XZ_UI_STEMS;
  m.deck[0].track="Caf\xc3\xa9 / D\xc3\xa9j\xc3\xa0 vu - WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
  m.deck[0].status="Long status with accents, lowercase and clipped edges";
  for(unsigned i=0;i<sizeof(pixels)/sizeof(*pixels);i++)pixels[i]=0xabcd;

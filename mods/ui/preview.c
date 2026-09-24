@@ -34,7 +34,7 @@ int main(int argc,char **argv){
  model.connection.status="WAITING FOR VJ.Tools";
  static const char *names[]={"stems","xpad","settings","themes","connection","controls"};
  char name[80];
- for(int theme=0;theme<7;theme++){
+ for(int theme=0;theme<XZ_THEME_COUNT;theme++){
   model.theme=theme;
   for(int page=0;page<XZ_UI_PAGE_COUNT;page++){
    ui.page=(enum xz_ui_page)page;
@@ -54,5 +54,5 @@ int main(int argc,char **argv){
  model.deck[0].bpm=0;model.deck[0].track="NO TRACK LOADED";model.deck[0].status="LOAD A TRACK WITH A STEM CACHE";
  xz_ui_render(&ui,&model,pixels,800*480,800);save(argv[1],"unavailable",800,480);
  memset(pixels,0,sizeof(pixels));xz_ui_render_badge(pixels,800);save(argv[1],"badge",800,480);
- puts("Rendered all pages, seven themes, mute/inline/external/unavailable states");
+ puts("Rendered all pages, twelve themes, mute/inline/external/unavailable states");
 }

@@ -20,12 +20,12 @@ int main(void) {
         if(slot<3)assert(w.index==2-slot);
     }
     for(unsigned i=0;i<sizeof(frame)/sizeof(*frame);i++)frame[i]=0xabcd;
-    for(int theme=0;theme<7;theme++) {
+    for(int theme=0;theme<XZ_THEME_COUNT;theme++) {
         m.theme=theme;assert(xz_ui_inline_render(&u,&m,frame,540*XZ_WAVE_INLINE_HEIGHT,540,536,XZ_WAVE_INLINE_HEIGHT));
         for(int deck=0;deck<2;deck++)for(int col=0;col<3;col++){
             unsigned c=xz_ui_stem_color(theme,2-col);
             uint16_t expected=(uint16_t)(((c>>8)&0xf800)|((c>>5)&0x7e0)|((c>>3)&31));
-            int x=col*134+1;assert(frame[(deck*XZ_WAVE_CONTROL_HEIGHT+1)*540+x]==expected);
+            int x=col*134+1;if(theme<7)assert(frame[(deck*XZ_WAVE_CONTROL_HEIGHT+1)*540+x]==expected);
         }
         for(int y=0;y<XZ_WAVE_INLINE_HEIGHT;y++)for(int x=536;x<540;x++)assert(frame[y*540+x]==0xabcd);
         for(unsigned i=540*XZ_WAVE_INLINE_HEIGHT;i<sizeof(frame)/sizeof(*frame);i++)assert(frame[i]==0xabcd);

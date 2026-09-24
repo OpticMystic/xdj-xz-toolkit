@@ -22,6 +22,7 @@ def main():
         parser.error('Choose a new output path; existing packs are never overwritten')
     original = ImagePack.read(args.stock_pack)
     build_theme(args.stock_pack, args.output, args.preview_dir,
+                preferred_font=ROOT / 'mods/ui/fonts/BarlowSemiCondensed-Medium.ttf',
                 logo_path=ROOT / 'mods/ui/assets/xz-mods.png')
     result = ImagePack.read(args.output)
     before, after = original.to_bytes(), result.to_bytes()

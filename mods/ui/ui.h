@@ -2,6 +2,7 @@
 #define XZ_MOD_UI_H
 #include <stddef.h>
 #include <stdint.h>
+#include "themes.h"
 
 #define XZ_UI_WIDTH 800
 #define XZ_UI_HEIGHT 480

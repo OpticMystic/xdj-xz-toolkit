@@ -61,7 +61,7 @@ between hot cues, Groove and X-PAD.
 
 The five tabs expose three stem faders, hold-to-mute labels, bypass, modification
 dot, eight Groove pads, six X-PAD lengths, pitch strip, HOLD, OVERDUB, volume,
-eight sample pads, all enable settings, server settings and seven theme choices.
+eight sample pads, capability-aware settings and twelve theme choices.
 The VJ.Tools Connection tab remains visible even when no receiver integration is
 loaded. It shows receiver-reported readiness, connection state, device IP, port,
 protocol and frame rate. Unknown values read NOT REPORTED. `connection.ready`
@@ -98,8 +98,9 @@ compilation passed. DirectFB presentation, physical touch routing, audio actions
 and complete stock-screen recoloring remain separate runtime acceptance gates.
 ## Physical stem pads
 
-With stems enabled, the selected bank controls Vocals, Harmonics, Drums, then
-bypass on that physical deck. A-D is the default; E-H is an optional saved
+With stems enabled, the selected bank and pad mode control Vocals, Harmonics,
+Drums, then bypass on that physical deck. Other pad modes remain native,
+including Hot Cue when a different mode is selected. A-D is the default; E-H is an optional saved
 setting in MODS > Controls. The inactive bank keeps its normal hot cues. Screen
 labels, pad LEDs and touch actions follow the selected bank. The audio engine
 retains its internal Drums/Harmonics/Vocals storage order. Both decks stay
@@ -108,12 +109,12 @@ normal pad dispatch, including paired releases for presses already owned by the
 mod.
 
 Touch and pad mute controls share one latch. In the inline strip, tapping a
-stem toggles it and dragging adjusts its level. Both the inline strip and full
-panel show Vocals, Harmonics, Drums. Inline waveform placement uses the same
+stem toggles it and dragging adjusts its level. Raising a muted stem with a
+drag unmutes it. Inline waveform placement uses the same
 widget layout as the labels and touch targets.
 
 `test_pad_order.c` checks the physical A/B/C/D routing against onscreen actions
-on both decks and checks the full-panel order. Pad-state checks cover both
+on both decks and verifies the full panel no longer duplicates the mixer. Pad-state checks cover both
 banks, inactive-bank hot cues and release ownership across bank changes.
 `test_runtime_controls.c` checks touch/pad interoperability, LED colors, scene
 ownership and display bounds.
@@ -122,7 +123,7 @@ Physical acceptance of each new runtime remains separate from these tests.
 ## Two-deck stem controls on the native screen
 
 The 536x268 native waveform window keeps both deck waveforms. It places a
-40-pixel control row immediately after each waveform. Every row has four
+48-pixel control row immediately after each waveform. Every row has four
 buttons in the same order as the physical stem pad bank: Vocals, Harmonics,
 Drums, and Bypass. Eight touch targets stay visible together on the play
 screen, with no deck-switch button.
@@ -136,6 +137,22 @@ The MODS panel keeps the pad-bank and show settings. Closing it or hiding the
 inline rows does not change active stem levels or physical pad assignments.
 The dual-row layout has portable render and touch checks; hardware audio and
 screen acceptance must be recorded separately.
+
+## Streamlined menu and themes
+
+MODS opens to Controls, with Appearance, VJ.Tools and Advanced as its other
+main pages. The full-screen stem mixer is removed; Groove pads and X-PAD
+remain available under Advanced with truthful readiness indicators.
+Each inline stem shows its volume percentage and accepts a horizontal drag.
+
+The original seven themes keep their saved IDs. Game Boy, Super Nintendo,
+Windows 95, Game Boy Color and Aqua / iTunes add original interface chrome;
+the two handheld themes also use an original pixel font. Themes affect MODS
+and the inline controls, not the complete stock firmware interface.
+
+Development deployments can use `--ram-settings` to read existing settings
+while keeping changes in RAM. This avoids writing a newer theme ID into the
+older USB runtime's preferences; reboot restores the original settings.
 
 ## Enter and leave the VJ.Tools view
 

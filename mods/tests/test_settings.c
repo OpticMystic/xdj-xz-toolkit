@@ -21,6 +21,11 @@ int main(void) {
         assert(xz_settings_format(&a,text,sizeof(text))>0);
         assert(!xz_settings_parse(text,&b) && !memcmp(&a,&b,sizeof(a)));
     }
+    for(int theme=0;theme<12;theme++){
+        a.theme=theme;assert(xz_settings_format(&a,text,sizeof(text))>0);
+        assert(!xz_settings_parse(text,&b)&&b.theme==theme);
+    }
+    a.theme=12;assert(xz_settings_format(&a,text,sizeof(text))<0);a.theme=11;
     b=a;
     assert(xz_settings_parse("XZ_MODS_SETTINGS 2\n",&b)<0 && !memcmp(&a,&b,sizeof(a)));
     strcat(text,"unexpected=1\n");assert(xz_settings_parse(text,&b)<0);

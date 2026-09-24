@@ -33,29 +33,25 @@ int main(int argc,char **argv){
  assert(xz_ui_stem_color(0,0)==0xff3b30&&xz_ui_stem_color(0,1)==0x2997ff&&xz_ui_stem_color(0,2)==0x30d158);
  assert(xz_ui_stem_color(-1,9)==xz_ui_stem_color(0,0));
  for(i=0;i<4;i++){m.deck[i].groove_active=-1;m.deck[i].sample_active=-1;m.deck[i].sample_volume=1;for(j=0;j<3;j++)m.deck[i].levels[j]=1;}
- assert(tap(&u,&m,XZ_UI_BYPASS,0).kind==XZ_UI_UNAVAILABLE);assert(strstr(u.notice,"NOT READY"));
- m.enabled=XZ_UI_STEM|XZ_UI_SAMPLE; m.deck[0].ready=0x7ff;
- {struct xz_ui saved=u;u.deck=3;u.page=XZ_UI_SETTINGS;
-  assert(tap(&u,&m,XZ_UI_ENABLE,XZ_UI_STEM).kind==XZ_UI_ENABLE);
-  u.page=XZ_UI_STEMS;assert(tap(&u,&m,XZ_UI_MUTE,0).kind==XZ_UI_UNAVAILABLE);u=saved;}
+ assert(u.page==XZ_UI_CONTROLS);
+ {struct xz_ui_widget widgets[XZ_UI_WIDGETS];size_t count=xz_ui_layout(&u,&m,widgets);int tabs=0;
+  for(size_t k=0;k<count;k++){
+   if(widgets[k].kind==XZ_UI_PANEL){tabs++;assert(widgets[k].index!=XZ_UI_STEMS&&widgets[k].index!=XZ_UI_XPAD);}
+   assert(widgets[k].kind!=XZ_UI_DECK&&widgets[k].kind!=XZ_UI_LEVEL&&widgets[k].kind!=XZ_UI_MUTE);
+  }assert(tabs==4);}
+ assert(tap(&u,&m,XZ_UI_ENABLE,XZ_UI_STEM).kind==XZ_UI_UNAVAILABLE);
+ m.enabled=XZ_UI_STEM|XZ_UI_SAMPLE;m.deck[0].ready=0x3fff;
+ assert(tap(&u,&m,XZ_UI_ENABLE,XZ_UI_STEM).kind==XZ_UI_ENABLE);
+ assert(tap(&u,&m,XZ_UI_STEMS_OVERLAY,0).kind==XZ_UI_STEMS_OVERLAY);
+ tap(&u,&m,XZ_UI_PANEL,XZ_UI_SETTINGS);tap(&u,&m,XZ_UI_PANEL,XZ_UI_STEMS);
  m.deck[0].groove_assigned=255;m.deck[0].groove_loaded=255;m.deck[0].sample_loaded=255;m.deck[0].loop_index=3;
- assert(tap(&u,&m,XZ_UI_BYPASS,0).kind==XZ_UI_BYPASS);
- assert(m.deck[0].bypass==0);
- w=find(&u,&m,XZ_UI_MUTE,1);
- assert(xz_ui_touch(&u,&m,w.x+4,w.y+4,1,a)==1&&a[0].kind==XZ_UI_MUTE&&a[0].value==1);
- assert(xz_ui_touch(&u,&m,799,479,1,a)==0);
- assert(xz_ui_touch(&u,&m,-50,-50,0,a)==1&&a[0].kind==XZ_UI_MUTE&&a[0].phase==XZ_UI_RELEASE&&a[0].index==1);
- w=find(&u,&m,XZ_UI_LEVEL,0);
- assert(xz_ui_touch(&u,&m,w.x+8,w.y+20,1,a)==1&&a[0].value==0);
- assert(xz_ui_touch(&u,&m,1000,w.y+20,1,a)==1&&a[0].value==1);
- xz_ui_cancel(&u,a);
  for(i=0;i<8;i++)assert(tap(&u,&m,XZ_UI_GROOVE_PAD,i).index==i);
  m.deck[0].groove_assigned=254;
  assert(tap(&u,&m,XZ_UI_HOTCUE_PAD,0).kind==XZ_UI_HOTCUE_PAD);
  m.deck[0].groove_assigned=255;m.deck[0].groove_loaded=254;
  assert(tap(&u,&m,XZ_UI_GROOVE_PAD,0).kind==XZ_UI_UNAVAILABLE);
  m.deck[0].groove_loaded=255;
- assert(tap(&u,&m,XZ_UI_PANEL,XZ_UI_XPAD).value==XZ_UI_XPAD);
+ tap(&u,&m,XZ_UI_PANEL,XZ_UI_SETTINGS);assert(tap(&u,&m,XZ_UI_PANEL,XZ_UI_XPAD).value==XZ_UI_XPAD);
  for(i=0;i<6;i++){
   w=find(&u,&m,XZ_UI_STRIP,0);
   assert(xz_ui_touch(&u,&m,w.x+i*96+40,w.y,1,a)==1&&a[0].index==i&&a[0].secondary==12);
@@ -68,12 +64,10 @@ int main(int argc,char **argv){
  m.deck[0].sample_loaded=1;
  assert(tap(&u,&m,XZ_UI_SAMPLE_PAD,7).kind==XZ_UI_UNAVAILABLE);
  tap(&u,&m,XZ_UI_PANEL,XZ_UI_SETTINGS);
- for(i=0;i<5;i++){int flags[5]={XZ_UI_GATE,XZ_UI_SMART,XZ_UI_PREVIEW,XZ_UI_STEM,XZ_UI_SAMPLE};assert(tap(&u,&m,XZ_UI_ENABLE,flags[i]).kind==XZ_UI_ENABLE);}
- assert(tap(&u,&m,XZ_UI_SERVER_AUTO,0).value==0);
- assert(tap(&u,&m,XZ_UI_SERVER_ADDRESS,0).kind==XZ_UI_SERVER_ADDRESS);
+ for(i=0;i<4;i++){int flags[4]={XZ_UI_GATE,XZ_UI_SMART,XZ_UI_PREVIEW,XZ_UI_SAMPLE};assert(tap(&u,&m,XZ_UI_ENABLE,flags[i]).kind==XZ_UI_ENABLE);}
  assert(tap(&u,&m,XZ_UI_KEY_SHIFT,-1).value==-1);
  assert(tap(&u,&m,XZ_UI_KEY_SHIFT,0).value==0);
- assert(tap(&u,&m,XZ_UI_KEY_SYNC,0).kind==XZ_UI_UNAVAILABLE);
+ m.deck[0].ready&=~XZ_UI_KEYSYNC;assert(tap(&u,&m,XZ_UI_KEY_SYNC,0).kind==XZ_UI_UNAVAILABLE);
  m.deck[0].ready|=XZ_UI_KEYSYNC;
  assert(tap(&u,&m,XZ_UI_KEY_SYNC,0).kind==XZ_UI_KEY_SYNC);
  tap(&u,&m,XZ_UI_PANEL,XZ_UI_CONTROLS);
@@ -82,14 +76,14 @@ int main(int argc,char **argv){
   assert(result.kind==XZ_UI_STEM_PAGE&&result.index==i&&result.value==i);
  }
  assert(m.stem_page==0);
- assert(tap(&u,&m,XZ_UI_SHIFT_PAGES,0).value==1);
+ tap(&u,&m,XZ_UI_PANEL,XZ_UI_SETTINGS);assert(tap(&u,&m,XZ_UI_SHIFT_PAGES,0).value==1);
  m.shift_pages=1;assert(tap(&u,&m,XZ_UI_SHIFT_PAGES,0).value==0);
- assert(tap(&u,&m,XZ_UI_PAD_FEEDBACK,0).value==1);
+ tap(&u,&m,XZ_UI_PANEL,XZ_UI_CONTROLS);assert(tap(&u,&m,XZ_UI_PAD_FEEDBACK,0).value==1);
  m.pad_feedback=1;assert(tap(&u,&m,XZ_UI_PAD_FEEDBACK,0).value==0);
- assert(tap(&u,&m,XZ_UI_SHIFT_KEYSYNC,0).value==1);
+ tap(&u,&m,XZ_UI_PANEL,XZ_UI_SETTINGS);assert(tap(&u,&m,XZ_UI_SHIFT_KEYSYNC,0).value==1);
  m.shift_keysync=1;assert(tap(&u,&m,XZ_UI_SHIFT_KEYSYNC,0).value==0);
  /* Settings stay editable with no loaded track, and never mutate the snapshot. */
- m.deck[0].ready=0;
+ m.deck[0].ready=0;tap(&u,&m,XZ_UI_PANEL,XZ_UI_CONTROLS);
  assert(tap(&u,&m,XZ_UI_STEM_PAGE,2).value==2&&m.stem_page==0);
  m.settings_status="USB IS READ ONLY / SETTINGS NOT SAVED";
  assert(xz_ui_render(&u,&m,frame,800*480,800));
@@ -105,7 +99,7 @@ int main(int argc,char **argv){
   }
  }
  tap(&u,&m,XZ_UI_PANEL,XZ_UI_THEMES);
- for(i=0;i<7;i++){result=tap(&u,&m,XZ_UI_SET_THEME,i);assert(result.kind==XZ_UI_SET_THEME&&result.value==i);}
+ for(i=0;i<XZ_THEME_COUNT;i++){result=tap(&u,&m,XZ_UI_SET_THEME,i);assert(result.kind==XZ_UI_SET_THEME&&result.value==i);}
  tap(&u,&m,XZ_UI_PANEL,XZ_UI_CONNECTION);
  assert(tap(&u,&m,XZ_UI_CONNECTION_ENABLE,0).kind==XZ_UI_UNAVAILABLE);
  m.connection.can_enable=1;
@@ -132,21 +126,20 @@ int main(int argc,char **argv){
  assert(result.kind==XZ_UI_TAKEOVER_ASSIGN&&result.index==2);
  xz_ui_render_vj_button(frame,800,1);
  xz_ui_render_vj_button(frame,800,0);
- tap(&u,&m,XZ_UI_DECK,3);assert(u.deck==3);
+ u.deck=3;
  assert(tap(&u,&m,XZ_UI_CONNECTION_ENABLE,0).kind==XZ_UI_CONNECTION_ENABLE);
- tap(&u,&m,XZ_UI_PANEL,XZ_UI_STEMS);assert(tap(&u,&m,XZ_UI_LEVEL,0).kind==XZ_UI_UNAVAILABLE);
- tap(&u,&m,XZ_UI_DECK,0);
+ u.deck=0;
  assert(!xz_ui_render(&u,&m,frame,10,800));assert(!xz_ui_render(&u,&m,frame,800*480,799));
  for(i=0;i<16;i++)frame[800*480+i]=0xdead;
- for(i=0;i<7;i++)for(j=0;j<XZ_UI_PAGE_COUNT;j++){m.theme=i;u.page=(enum xz_ui_page)j;assert(xz_ui_render(&u,&m,frame,800*480,800));}
+ for(i=0;i<XZ_THEME_COUNT;i++)for(j=0;j<XZ_UI_PAGE_COUNT;j++){m.theme=i;u.page=(enum xz_ui_page)j;assert(xz_ui_render(&u,&m,frame,800*480,800));}
  for(i=0;i<16;i++)assert(frame[800*480+i]==0xdead);
  /* Save status remains visible even when another notice occupies the footer. */
  {
   uint16_t saved[800*20];
   u.page=XZ_UI_CONTROLS;strcpy(u.notice,"OTHER NOTICE");m.settings_status="SETTINGS SAVED TO USB";
-  assert(xz_ui_render(&u,&m,frame,800*480,800));memcpy(saved,frame+800*426,sizeof(saved));
+  assert(xz_ui_render(&u,&m,frame,800*480,800));memcpy(saved,frame+800*458,sizeof(saved));
   m.settings_status="SETTINGS NOT SAVED: CHECK USB";
-  assert(xz_ui_render(&u,&m,frame,800*480,800));assert(memcmp(saved,frame+800*426,sizeof(saved)));
+  assert(xz_ui_render(&u,&m,frame,800*480,800));assert(memcmp(saved,frame+800*458,sizeof(saved)));
   u.notice[0]=0;
  }
  if(argc>1){char path[512];m.theme=4;m.deck[0].bpm=128;m.deck[0].track="DECK 1 / USB STEM CACHE";
@@ -156,9 +149,9 @@ int main(int argc,char **argv){
   m.connection.status="HOST RENDER DEMO / NO RECEIVER CONNECTION REPORTED";
   for(i=0;i<XZ_UI_PAGE_COUNT;i++){u.page=(enum xz_ui_page)i;u.notice[0]=0;assert(xz_ui_render(&u,&m,frame,800*480,800));snprintf(path,sizeof(path),"%s/page-%d.ppm",argv[1],i);ppm(path);}
   u.page=XZ_UI_STEMS;
-  for(i=0;i<7;i++){m.theme=i;assert(xz_ui_render(&u,&m,frame,800*480,800));snprintf(path,sizeof(path),"%s/theme-%d.ppm",argv[1],i);ppm(path);}
+  for(i=0;i<XZ_THEME_COUNT;i++){m.theme=i;assert(xz_ui_render(&u,&m,frame,800*480,800));snprintf(path,sizeof(path),"%s/theme-%d.ppm",argv[1],i);ppm(path);}
   m.theme=0;m.enabled=0;m.deck[0].ready=0;m.deck[0].status="RUNTIME NOT CONNECTED / FEATURES REMAIN VISIBLE";
   assert(xz_ui_render(&u,&m,frame,800*480,800));snprintf(path,sizeof(path),"%s/not-ready.ppm",argv[1]);ppm(path);
  }
- puts("UI: touch semantics, readiness, seven palettes, bounds PASS");return 0;
+ puts("UI: touch semantics, readiness, twelve themes, bounds PASS");return 0;
 }

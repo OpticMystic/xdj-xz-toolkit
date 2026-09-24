@@ -2,22 +2,12 @@
 #include "stem_pads.h"
 #include "font_atlas.h"
 #include "wave_viewport.h"
+#include "pixel_font.h"
 #include <stdio.h>
 #include <string.h>
 
-struct palette { uint32_t bg,ink,accent,alarm,stem[3]; };
-/* Authored seed colors from upstream presets.c; see PROVENANCE.md. */
-static const struct palette palettes[7] = {
- {0x000000,0xf4f5f6,0xa8ceff,0xffa000,{0xff3b30,0x2997ff,0x30d158}},
- {0xf0f0f0,0x141414,0x176398,0xa35400,{0xc52727,0x125eae,0x16753d}},
- {0x00060e,0xdff3f7,0x54c1e6,0xfee801,{0xff2e88,0x54c1e6,0x2bf58a}},
- {0x0b0d17,0xc9d1d9,0x00e5ff,0xff9100,{0xff2daa,0x00e5ff,0x7c4dff}},
- {0x1e1e2e,0xcdd6f4,0xcba6f7,0xfab387,{0xf38ba8,0x89b4fa,0xa6e3a1}},
- {0x141414,0xf0fef9,0x00e575,0xd451ff,{0xff4fc3,0x006afb,0x00e575}},
- {0xfbf0d9,0x262a44,0x393f61,0xfdb03f,{0xe8705d,0x393f61,0x869a5f}}
-};
-static const char *themes[7]={"ORIGINAL","WHITE","CYBERPUNK","NEON","MOCHA","AURORA","SANDSTONE"};
-static const char *pages[XZ_UI_PAGE_COUNT]={"STEMS / GC","X-PAD","SETTINGS","THEMES","VJ.TOOLS","CONTROLS"};
+static const enum xz_ui_page menu_pages[4]={XZ_UI_CONTROLS,XZ_UI_THEMES,XZ_UI_CONNECTION,XZ_UI_SETTINGS};
+static const char *menu_names[4]={"CONTROLS","APPEARANCE","VJ.TOOLS","ADVANCED"};
 static const char *stem_pages[4]={"HOT CUE","BEAT LOOP","SLIP LOOP","BEAT JUMP"};
 static const char *stems[3]={"DRUMS","HARMONICS","VOCALS"};
 static const char *pads[8]={"A","B","C","D","E","F","G","H"};
@@ -29,7 +19,7 @@ static uint32_t blend(uint32_t a,uint32_t b,unsigned n){
  unsigned g=(((a>>8)&255)*(256-n)+((b>>8)&255)*n)>>8;
  unsigned v=((a&255)*(256-n)+(b&255)*n)>>8;return (r<<16)|(g<<8)|v;
 }
-struct canvas {uint16_t *p;size_t stride;int width,height;};
+struct canvas {uint16_t *p;size_t stride;int width,height,theme;};
 static void rect(struct canvas c,int x,int y,int w,int h,uint32_t col){
  int xx,yy;if(x<0){w+=x;x=0;}if(y<0){h+=y;y=0;}
  if(x+w>c.width)w=c.width-x;if(y+h>c.height)h=c.height-y;
@@ -64,6 +54,15 @@ static void letter(struct canvas c,int x,int y,const struct xz_font_glyph *g,uin
 }
 static void text(struct canvas c,int x,int y,const char *s,int scale,int limit,uint32_t color){
  if(!s||limit<=0)return;
+ if(c.theme==7||c.theme==10){
+  int size=scale>1?2:1;
+  for(int count=0;*s&&count<limit;count++,x+=6*size){
+   unsigned ch=codepoint(&s);
+   for(unsigned row=0;row<7;row++)for(unsigned col=0;col<5;col++)
+    if(xz_pixel_font_row(ch,row)&(1u<<(4-col)))rect(c,x+(int)col*size,y+(int)row*size,size,size,color);
+  }
+  return;
+ }
  int face=scale>1?1:0,end=x+limit*6*scale;
  while(*s){
   unsigned ch=codepoint(&s);const struct xz_font_glyph *g=&xz_font_glyphs[face][ch-32];
@@ -75,7 +74,13 @@ static void border(struct canvas c,int x,int y,int w,int h,uint32_t color){
  rect(c,x,y,w,1,color);rect(c,x,y+h-1,w,1,color);
  rect(c,x,y,1,h,color);rect(c,x+w-1,y,1,h,color);
 }
-static void deck_card(struct canvas c,const struct xz_ui_widget *a,int selected,const struct palette *p){
+static struct xz_theme_surface themed(struct canvas c){
+ return (struct xz_theme_surface){c.p,c.stride,c.width,c.height,0,0,c.width,c.height};
+}
+static void frame(struct canvas c,int theme,struct xz_ui_widget a,uint32_t fill,int selected){
+ xz_theme_frame(themed(c),theme,(struct xz_theme_rect){a.x,a.y,a.w,a.h},fill,selected,XZ_THEME_BUTTON);
+}
+static void deck_card(struct canvas c,const struct xz_ui_widget *a,int selected,const struct xz_theme_palette *p){
  uint32_t edge=selected?p->accent:blend(p->bg,p->ink,112);
  for(int row=0;row<a->h;row++){
   int width=a->w-9+row*9/(a->h-1);
@@ -87,19 +92,19 @@ static void deck_card(struct canvas c,const struct xz_ui_widget *a,int selected,
 }
 void xz_ui_render_badge(uint16_t *pixels,size_t stride){
  if(!pixels||stride<800)return;
- struct canvas c={pixels,stride,800,480};
+ struct canvas c={pixels,stride,800,480,0};
  rect(c,744,0,56,24,0x15191e);border(c,744,0,56,24,0xa8ceff);
  text(c,751,5,"MODS",2,4,0xf4f5f6);
 }
 void xz_ui_render_stems_button(uint16_t *pixels,size_t stride,int enabled){
  if(!pixels||stride<800)return;
- struct canvas c={pixels,stride,800,480};uint32_t color=enabled?0x52d794:0xa8ceff;
+ struct canvas c={pixels,stride,800,480,0};uint32_t color=enabled?0x52d794:0xa8ceff;
  rect(c,674,0,68,24,enabled?0x123c2a:0x15191e);border(c,674,0,68,24,color);
  text(c,681,5,"STEMS",2,5,color);
 }
 void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active){
  if(!pixels||stride<800)return;
- struct canvas c={pixels,stride,800,480};
+ struct canvas c={pixels,stride,800,480,0};
  uint32_t border_col=takeover_active?0x52d794:0xa8ceff;
  rect(c,0,0,112,24,0x15191e);border(c,0,0,112,24,border_col);
  text(c,7,5,takeover_active?"EXIT VJ":"VJ.TOOLS",2,8,takeover_active?0x52d794:0xf4f5f6);
@@ -108,22 +113,18 @@ static void add(struct xz_ui_widget *w,size_t *n,int x,int y,int width,int heigh
  enum xz_ui_action_kind kind,int index,uint32_t cap,const char *label){
  w[*n]=(struct xz_ui_widget){x,y,width,height,kind,index,cap,label,-1};(*n)++;
 }
-const char *xz_ui_theme_name(int theme){return themes[theme>=0&&theme<7?theme:0];}
+const char *xz_ui_theme_name(int theme){return xz_theme_name(theme);}
 uint32_t xz_ui_stem_color(int theme,int index){
- return palettes[theme>=0&&theme<7?theme:0].stem[index>=0&&index<3?index:0];
+ return xz_theme_palette(theme)->stem[index>=0&&index<3?index:0];
 }
-void xz_ui_init(struct xz_ui *u){memset(u,0,sizeof(*u));u->capture=-1;}
+void xz_ui_init(struct xz_ui *u){memset(u,0,sizeof(*u));u->capture=-1;u->page=XZ_UI_CONTROLS;}
 size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_ui_widget w[XZ_UI_WIDGETS]){
  size_t n=0;int i;
- for(i=0;i<4;i++)add(w,&n,12+i*170,40,162,42,XZ_UI_DECK,i,0,i<2?"INTERNAL USB":"PC / HYBRID");
- add(w,&n,700,40,88,42,XZ_UI_CLOSE,0,0,"CLOSE");
- for(i=0;i<XZ_UI_PAGE_COUNT;i++)add(w,&n,12+i*130,92,126,42,XZ_UI_PANEL,i,0,pages[i]);
+ for(i=0;i<4;i++)add(w,&n,12+i*168,46,160,44,XZ_UI_PANEL,menu_pages[i],0,menu_names[i]);
+ add(w,&n,700,46,88,44,XZ_UI_CLOSE,0,0,"CLOSE");
+ if(u->page==XZ_UI_STEMS||u->page==XZ_UI_XPAD||u->page==XZ_UI_SETTINGS)
+  for(i=0;i<2;i++)add(w,&n,12+i*170,100,162,38,XZ_UI_DECK,i,0,"USB DECK");
  if(u->page==XZ_UI_STEMS){
-  add(w,&n,12,224,98,52,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
-  for(i=0;i<3;i++){
-   add(w,&n,122+i*224,224,212,38,XZ_UI_MUTE,xz_stem_for_pad(i),XZ_UI_STEM,stems[xz_stem_for_pad(i)]);
-   add(w,&n,122+i*224,266,212,42,XZ_UI_LEVEL,xz_stem_for_pad(i),XZ_UI_STEM,"");
-  }
   for(i=0;i<8;i++){
    int assigned=(m->deck[u->deck].groove_assigned&(1u<<i))!=0;
    add(w,&n,12+i*98,352,90,64,assigned?XZ_UI_GROOVE_PAD:XZ_UI_HOTCUE_PAD,i,
@@ -136,25 +137,27 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
   add(w,&n,600,306,188,42,XZ_UI_VOLUME,0,XZ_UI_SAMPLE,"");
   for(i=0;i<8;i++)add(w,&n,12+i*98,386,90,42,XZ_UI_SAMPLE_PAD,i,XZ_UI_SAMPLE,pads[i]);
  }else if(u->page==XZ_UI_SETTINGS){
-  static const char *labels[5]={"GATE CUE","SMART CUE","PREVIEW HOTCUE","ENABLE STEMS","ENABLE X-PAD"};
-  static const uint32_t flags[5]={XZ_UI_GATE,XZ_UI_SMART,XZ_UI_PREVIEW,XZ_UI_STEM,XZ_UI_SAMPLE};
-  for(i=0;i<5;i++)add(w,&n,12,152+i*50,366,42,XZ_UI_ENABLE,(int)flags[i],flags[i],labels[i]);
-  add(w,&n,12,402,366,42,XZ_UI_PANEL,XZ_UI_THEMES,0,"THEME");
-  add(w,&n,398,152,390,42,XZ_UI_SERVER_AUTO,0,XZ_UI_SERVER,"STEM SERVER LOCATION");
-  add(w,&n,398,204,390,42,XZ_UI_SERVER_ADDRESS,0,XZ_UI_SERVER,"STEM SERVER ADDRESS");
-  add(w,&n,398,280,86,46,XZ_UI_KEY_SHIFT,-1,XZ_UI_KEY,"KEY -");
-  add(w,&n,492,280,80,46,XZ_UI_KEY_SHIFT,0,XZ_UI_KEY,"RESET");
-  add(w,&n,580,280,86,46,XZ_UI_KEY_SHIFT,1,XZ_UI_KEY,"KEY +");
-  add(w,&n,674,280,114,46,XZ_UI_KEY_SYNC,0,XZ_UI_KEYSYNC,"KEY SYNC");
+  add(w,&n,12,154,376,44,XZ_UI_ENABLE,XZ_UI_GATE,XZ_UI_GATE,"GATE CUE");
+  add(w,&n,412,154,376,44,XZ_UI_ENABLE,XZ_UI_SMART,XZ_UI_SMART,"SMART CUE");
+  add(w,&n,12,210,376,44,XZ_UI_ENABLE,XZ_UI_PREVIEW,XZ_UI_PREVIEW,"HOT-CUE PREVIEW");
+  add(w,&n,412,210,376,44,XZ_UI_ENABLE,XZ_UI_SAMPLE,XZ_UI_SAMPLE,"X-PAD ENGINE");
+  add(w,&n,12,266,376,44,XZ_UI_PANEL,XZ_UI_STEMS,0,"GROOVE PADS");
+  add(w,&n,412,266,376,44,XZ_UI_PANEL,XZ_UI_XPAD,0,"X-PAD CONTROLS");
+  add(w,&n,12,328,86,46,XZ_UI_KEY_SHIFT,-1,XZ_UI_KEY,"KEY -");
+  add(w,&n,106,328,80,46,XZ_UI_KEY_SHIFT,0,XZ_UI_KEY,"RESET");
+  add(w,&n,194,328,86,46,XZ_UI_KEY_SHIFT,1,XZ_UI_KEY,"KEY +");
+  add(w,&n,288,328,100,46,XZ_UI_KEY_SYNC,0,XZ_UI_KEYSYNC,"KEY SYNC");
+  add(w,&n,412,328,376,46,XZ_UI_SHIFT_KEYSYNC,0,XZ_UI_KEYSYNC,"SHIFT + SYNC");
+  add(w,&n,12,388,376,44,XZ_UI_SHIFT_PAGES,0,0,"SHIFT + PAD MODES");
  }else if(u->page==XZ_UI_CONTROLS){
-  add(w,&n,12,228,180,36,XZ_UI_STEM_BANK,0,0,"STEMS ON A-D");
-  add(w,&n,202,228,186,36,XZ_UI_STEM_BANK,1,0,"STEMS ON E-H");
-  for(i=0;i<4;i++)add(w,&n,12+i*196,174,188,44,XZ_UI_STEM_PAGE,i,0,stem_pages[i]);
-  add(w,&n,12,274,376,44,XZ_UI_SHIFT_PAGES,0,0,"SHIFT + PAGE BUTTONS");
-  add(w,&n,12,328,376,44,XZ_UI_PAD_FEEDBACK,0,0,"PAD COLOR FEEDBACK");
-  add(w,&n,12,382,376,44,XZ_UI_SHIFT_KEYSYNC,0,0,"SHIFT + SYNC");
+  add(w,&n,12,154,376,48,XZ_UI_ENABLE,XZ_UI_STEM,XZ_UI_STEM,"STEM AUDIO");
+  add(w,&n,412,154,376,48,XZ_UI_STEMS_OVERLAY,0,0,"SHOW STEM ROWS");
+  add(w,&n,12,254,180,44,XZ_UI_STEM_BANK,0,0,"PADS A-D");
+  add(w,&n,202,254,186,44,XZ_UI_STEM_BANK,1,0,"PADS E-H");
+  add(w,&n,412,254,376,44,XZ_UI_PAD_FEEDBACK,0,0,"STEM PAD LIGHTS");
+  for(i=0;i<4;i++)add(w,&n,12+i*196,334,188,44,XZ_UI_STEM_PAGE,i,0,stem_pages[i]);
  }else if(u->page==XZ_UI_THEMES){
-  for(i=0;i<7;i++)add(w,&n,12+(i%3)*262,158+(i/3)*88,252,72,XZ_UI_SET_THEME,i,XZ_UI_THEME,themes[i]);
+  for(i=0;i<XZ_THEME_COUNT;i++)add(w,&n,12+(i%3)*262,158+(i/3)*70,252,62,XZ_UI_SET_THEME,i,0,xz_theme_name(i));
  }else if(u->page==XZ_UI_CONNECTION){
   add(w,&n,492,142,296,42,XZ_UI_TAKEOVER_TOGGLE,0,0,"VJ.TOOLS VIEW");
   add(w,&n,492,238,94,40,XZ_UI_TAKEOVER_ASSIGN,0,0,"LINK");
@@ -181,13 +184,13 @@ static int ready(const struct xz_ui_model *m,int deck,const struct xz_ui_widget 
  default:return 1;}
 }
 int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pixels,size_t count,size_t stride){
- struct xz_ui_widget w[XZ_UI_WIDGETS];size_t n,i;struct canvas c;const struct palette *p;const struct xz_ui_deck *d;uint32_t panel,dim;char buf[96];
+ struct xz_ui_widget w[XZ_UI_WIDGETS];size_t n,i;struct canvas c;const struct xz_theme_palette *p;const struct xz_ui_deck *d;uint32_t panel,dim;char buf[96];
  if(!u||!m||!pixels||u->deck<0||u->deck>3||stride<800||stride>count/480)return 0;
- c=(struct canvas){pixels,stride,800,480};p=&palettes[m->theme>=0&&m->theme<7?m->theme:0];d=&m->deck[u->deck];
- panel=blend(p->bg,p->ink,28);dim=blend(p->bg,p->ink,154);rect(c,0,0,800,480,p->bg);
- rect(c,0,0,800,30,blend(p->bg,p->ink,15));rect(c,0,29,800,1,blend(p->bg,p->ink,90));
- text(c,12,7,"XZ MODS",2,15,p->ink);text(c,108,10,"XDJ-XZ",1,20,dim);
- text(c,691,9,"VJ.Tools",1,16,p->accent);
+ c=(struct canvas){pixels,stride,800,480,m->theme};p=xz_theme_palette(m->theme);d=&m->deck[u->deck];
+ panel=blend(p->bg,p->ink,28);dim=blend(p->bg,p->ink,154);xz_theme_background(themed(c),m->theme,(struct xz_theme_rect){0,0,800,480});
+ xz_theme_frame(themed(c),m->theme,(struct xz_theme_rect){0,0,800,30},blend(p->bg,p->ink,15),0,XZ_THEME_HEADER);
+ text(c,12,7,"XZ MODS",2,15,m->theme==9?0xffffff:p->ink);text(c,108,10,"XDJ-XZ",1,20,m->theme==9?0xffffff:dim);
+ text(c,680,9,"vj.tools/xzmods",1,18,m->theme==9?0xffffff:p->accent);
  n=xz_ui_layout(u,m,w);
  for(i=0;i<n;i++){
   struct xz_ui_widget a=w[i];int available=ready(m,u->deck,&a),selected=0;uint32_t color=p->accent;
@@ -197,6 +200,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(a.kind==XZ_UI_STEM_PAGE)selected=a.index==m->stem_page;
   if(a.kind==XZ_UI_SHIFT_PAGES)selected=m->shift_pages;
   if(a.kind==XZ_UI_PAD_FEEDBACK)selected=m->pad_feedback;
+  if(a.kind==XZ_UI_STEMS_OVERLAY)selected=m->stems_overlay;
   if(a.kind==XZ_UI_SHIFT_KEYSYNC)selected=m->shift_keysync;
   if(a.kind==XZ_UI_STEM_BANK)selected=m->stem_bank==a.index;
   if(a.kind==XZ_UI_TAKEOVER_TOGGLE){color=0x52d794;selected=m->fb_takeover!=0;}
@@ -211,8 +215,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(a.kind==XZ_UI_GROOVE_PAD){color=p->stem[d->groove_stem[a.index]<3?d->groove_stem[a.index]:0];selected=d->groove_active==a.index&&m->blink;}
   if(a.kind==XZ_UI_SAMPLE_PAD)selected=d->sample_active==a.index;
   if(a.kind!=XZ_UI_DECK){
-   rect(c,a.x,a.y,a.w,a.h,available?(selected?blend(panel,color,38):panel):blend(p->bg,p->ink,14));
-   border(c,a.x,a.y,a.w,a.h,available&&selected?color:blend(p->bg,p->ink,102));
+   frame(c,m->theme,a,available?(selected?blend(panel,color,38):panel):blend(p->bg,p->ink,14),available&&selected);
   }
   if(a.kind==XZ_UI_PANEL)rect(c,a.x,a.y+a.h-3,a.w,3,selected?p->accent:blend(p->bg,p->ink,58));
   if(a.kind==XZ_UI_MUTE||a.kind==XZ_UI_GROOVE_PAD)rect(c,a.x,a.y,a.w,3,available?color:dim);
@@ -221,7 +224,14 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
       rect(c,a.x+a.w-8,a.y+7,4,4,p->alarm);
   if(a.kind==XZ_UI_DECK){
    deck_card(c,&a,selected,p);snprintf(buf,sizeof(buf),"DECK %d",a.index+1);
-   text(c,a.x+14,a.y+5,buf,2,12,p->ink);text(c,a.x+14,a.y+27,a.label,1,22,dim);
+   text(c,a.x+14,a.y+4,buf,2,12,p->ink);text(c,a.x+14,a.y+24,a.label,1,22,dim);
+  }
+  else if(a.kind==XZ_UI_SET_THEME){
+   const struct xz_theme_palette *sample=xz_theme_palette(a.index);
+   struct canvas sample_canvas=c;sample_canvas.theme=a.index;
+   frame(c,a.index,a,sample->bg,selected);
+   text(sample_canvas,a.x+14,a.y+12,a.label,2,(a.w-28)/12,sample->ink);
+   text(sample_canvas,a.x+14,a.y+40,selected?"SELECTED":"TAP TO APPLY",1,32,sample->ink);
   }
   else if(a.kind==XZ_UI_LEVEL||a.kind==XZ_UI_VOLUME){
    float value=a.kind==XZ_UI_LEVEL?d->levels[a.index]:d->sample_volume;
@@ -249,7 +259,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
     rect(c,a.x+a.w-63,a.y+10,55,17,p->alarm);
     text(c,a.x+a.w-58,a.y+13,"MUTED",1,9,p->bg);
    }
-   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE)
+   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE||a.kind==XZ_UI_STEMS_OVERLAY)
     text(c,a.x+a.w-40,a.y+18,selected?"ON":"OFF",1,6,selected?p->accent:dim);
    if(a.kind==XZ_UI_ENABLE)text(c,a.x+a.w-78,a.y+16,!available?"NOT READY":selected?"ON":"OFF",1,12,available&&selected?p->accent:dim);
    if(a.kind==XZ_UI_CONNECTION_ENABLE||a.kind==XZ_UI_DISCOVERY)
@@ -271,20 +281,27 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   rect(c,12,197,776,1,blend(p->bg,p->ink,40));
   if(d->wave_peaks&&d->wave_count){size_t j;for(j=0;j<d->wave_count&&j<388;j++){int x=12+(int)(j*776/d->wave_count);int h=d->wave_peaks[j]*40/255;rect(c,x,198-h/2,2,h,p->accent);}}
   else {rect(c,295,186,212,22,p->bg);text(c,306,191,"WAVEFORM NOT AVAILABLE",1,35,dim);}
-  if(u->page==XZ_UI_STEMS){text(c,12,317,"GROOVE CIRCUIT",2,28,p->ink);text(c,190,322,"BANK A-H",1,20,dim);text(c,12,338,"TAP TO REPLACE A STEM / TAP AGAIN TO RELEASE",1,100,dim);snprintf(buf,sizeof(buf),"%s%s    %s",m->stem_page>0?"HOT CUE + ":"",stem_pages[m->stem_page>=0&&m->stem_page<4?m->stem_page:0],m->stem_bank?"E VOCALS / F HARMONICS / G DRUMS / H BYPASS":"A VOCALS / B HARMONICS / C DRUMS / D BYPASS");text(c,12,428,buf,1,115,dim);}
+  if(u->page==XZ_UI_STEMS){
+   text(c,12,234,"GROOVE PADS",2,55,p->ink);
+   text(c,12,269,"REPLACE A STEM WITH AN ASSIGNED GROOVE",1,115,dim);
+   text(c,12,294,"USE THE PLAY-SCREEN ROWS TO MIX STEMS",1,115,dim);
+   text(c,12,324,"UNASSIGNED OR UNAVAILABLE PADS ARE MARKED BELOW",1,115,dim);
+  }
   else{snprintf(buf,sizeof(buf),"%s BEATS / %+.1f KEY",lengths[d->loop_index>=0&&d->loop_index<6?d->loop_index:0],(double)d->pitch);text(c,600,279,buf,1,31,p->alarm);text(c,600,357,"VOL / HOLD LATCHES",1,30,dim);text(c,12,372,"SAMPLE BANK A-H / CLOSING X-PAD STOPS SOUND",1,90,dim);}
- }else if(u->page==XZ_UI_SETTINGS){text(c,398,258,"KEY CONTROL",1,62,dim);text(c,398,348,"STEM AND CUE SETTINGS APPLY TO BOTH DECKS",1,62,p->ink);text(c,398,369,"UNAVAILABLE CONTROLS ARE MARKED NOT READY",1,62,dim);}
- else if(u->page==XZ_UI_CONTROLS){
-  text(c,12,149,"ADDITIONAL STEMS PAD PAGE",2,40,p->ink);
-  text(c,406,230,m->stem_bank?"E VOCALS / F HARMONICS / G DRUMS / H BYPASS":"A VOCALS / B HARMONICS / C DRUMS / D BYPASS",1,63,dim);
-  text(c,406,275,"TWO-DECK STEM CONTROLS",2,31,p->ink);
-  text(c,406,311,"FOUR BUTTONS UNDER EACH WAVEFORM",1,62,dim);
-  text(c,406,338,"VOCALS / HARMONICS / DRUMS / BYPASS",1,62,p->ink);
-  text(c,406,365,"TAP A STEM TO MUTE; DRAG TO SET LEVEL",1,62,dim);
-  text(c,406,392,"DECKS STAY SEPARATE ON THE PLAY SCREEN",1,62,dim);
-  text(c,12,430,m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS",1,115,p->ink);
+ }else if(u->page==XZ_UI_SETTINGS){
+  text(c,412,112,"DECK SETTINGS + EXPERIMENTAL TOOLS",1,58,dim);
+  text(c,412,395,"STEM SERVER: NOT AVAILABLE",1,54,dim);
+  text(c,412,416,"UNAVAILABLE TOOLS ARE MARKED NOT READY",1,58,dim);
  }
- else if(u->page==XZ_UI_THEMES)text(c,282,361,"ORIGINAL + SIX UPSTREAM THEMES",1,70,dim);
+ else if(u->page==XZ_UI_CONTROLS){
+  text(c,12,112,"STEMS ON THE PLAY SCREEN",2,62,p->ink);
+  text(c,12,222,"PHYSICAL PAD SHORTCUTS",2,62,p->ink);
+  text(c,12,311,"STEM PAD MODE / OTHER MODES KEEP THEIR NORMAL CONTROLS",1,118,dim);
+  text(c,12,393,"TAP A STEM TO MUTE. SLIDE LEFT OR RIGHT TO CHANGE ITS VOLUME.",1,126,p->ink);
+  text(c,12,412,"BYPASS RETURNS THAT DECK TO THE ORIGINAL MIX.",1,126,dim);
+  if(u->notice[0])text(c,12,430,u->notice,1,115,p->alarm);
+ }
+ else if(u->page==XZ_UI_THEMES)text(c,12,112,"CHOOSE A LOOK FOR MODS AND THE STEM ROWS",2,62,p->ink);
  else if(u->page==XZ_UI_CONNECTION){
   const struct xz_ui_connection *v=&m->connection;
   text(c,12,152,"VJ.TOOLS CONNECTION",2,50,p->ink);
@@ -303,15 +320,15 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(v->ready&&v->connected&&v->stats_valid)snprintf(buf,sizeof(buf),"%.1f HZ",(double)v->frame_hz);else snprintf(buf,sizeof(buf),"NOT REPORTED");
   text(c,144,338,buf,2,26,p->ink);
   text(c,24,378,"STATUS COMES FROM THE RECEIVER",1,65,dim);
-  text(c,492,192,m->fb_takeover?"VIDEO / FB TAKEOVER ACTIVE":"STOCK DISPLAY ACTIVE (TAKEOVER OFF)",1,45,m->fb_takeover?p->accent:dim);
-  text(c,492,220,"TAKEOVER BUTTON TRIGGER",1,30,dim);
-  text(c,492,402,"FOR VJ.TOOLS LIBRARY / STANDALONE READY",1,48,p->ink);
+  text(c,492,192,m->fb_takeover?"COMPUTER SCREEN ACTIVE":"NATIVE PLAY SCREEN ACTIVE",1,45,m->fb_takeover?p->accent:dim);
+  text(c,492,220,"SCREEN SWITCH BUTTON",1,30,dim);
+  text(c,492,402,"OPTIONAL VJ.TOOLS LIBRARY CONNECTION",1,48,p->ink);
   text(c,492,422,"vj.tools",2,24,p->accent);
   text(c,12,422,"DJ MODS: CDJ3K-MODS / NSAINTOT + CONTRIBUTORS",1,95,dim);
  }
- if(u->page==XZ_UI_SETTINGS)text(c,12,430,m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS",1,115,p->ink);
+
  rect(c,0,451,800,29,blend(p->bg,p->ink,20));rect(c,0,451,800,1,blend(p->bg,p->ink,90));
- text(c,12,461,u->notice[0]?u->notice:((u->page==XZ_UI_SETTINGS||u->page==XZ_UI_CONTROLS)?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):(u->page==XZ_UI_CONNECTION?(m->connection.status?m->connection.status:(m->connection.ready&&m->connection.connected?"VJ.Tools CONNECTED":"VJ.Tools CONNECTION AVAILABLE")):(d->status?d->status:"LOAD A TRACK TO USE DECK CONTROLS"))),1,126,u->notice[0]?p->alarm:dim);
+ text(c,12,461,u->page==XZ_UI_CONTROLS?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):u->notice[0]?u->notice:((u->page==XZ_UI_SETTINGS||u->page==XZ_UI_CONTROLS)?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):(u->page==XZ_UI_CONNECTION?(m->connection.status?m->connection.status:(m->connection.ready&&m->connection.connected?"VJ.Tools CONNECTED":"VJ.Tools CONNECTION AVAILABLE")):(d->status?d->status:"LOAD A TRACK TO USE DECK CONTROLS"))),1,126,u->notice[0]?p->alarm:dim);
  return 1;
 }
 static struct xz_ui_action action(enum xz_ui_action_kind kind,enum xz_ui_phase phase,int deck,int index,float value,float second){
@@ -384,7 +401,7 @@ size_t xz_ui_inline_touch(struct xz_ui *u,const struct xz_ui_model *m,int width,
   struct xz_ui_widget a=w[i];
   if(a.kind==XZ_UI_MUTE&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h&&ready(m,a.deck,&a)){
    u->down=1;u->capture=(int)i;u->held_kind=XZ_UI_MUTE;u->held_deck=a.deck;u->held_index=a.index;
-   u->touch_start_x=x;u->touch_start_level=m->deck[a.deck].levels[a.index];u->dragged=0;return 0;
+   u->touch_start_x=x;u->touch_start_level=(m->deck[a.deck].muted&(1u<<a.index))?0:m->deck[a.deck].levels[a.index];u->dragged=0;return 0;
   }
  }
  if(u->held_kind==XZ_UI_MUTE&&u->capture>=0&&(size_t)u->capture<count){
@@ -403,8 +420,8 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
  struct xz_ui_widget w[XZ_UI_WIDGETS];
  if(!u||!m||!pixels||height<=0||width<=0||stride<(size_t)width||stride>count/(size_t)height)return 0;
  size_t n=xz_ui_inline_layout(u,width,height,w);if(!n)return 0;
- struct canvas c={pixels,stride,width,height};
- const struct palette *p=&palettes[m->theme>=0&&m->theme<7?m->theme:0];
+ struct canvas c={pixels,stride,width,height,m->theme};
+ const struct xz_theme_palette *p=xz_theme_palette(m->theme);
  rect(c,0,0,width,height,p->bg);
  for(size_t i=0;i<n;i++){
   struct xz_ui_widget a=w[i];const struct xz_ui_deck *d=&m->deck[a.deck];
@@ -417,19 +434,21 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
    int on=available&&!muted&&d->levels[a.index]>0;
    rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->stem[a.index],on?150:32));
    border(c,a.x,a.y,a.w,a.h,available?p->stem[a.index]:color);
+   if(m->theme>=7)frame(c,m->theme,a,blend(p->bg,p->stem[a.index],on?70:20),on);
    text(c,a.x+8,a.y+3,a.label,2,(a.w-16)/12,color);
-   text(c,a.x+a.w-11,a.y+4,pads[(m->stem_bank==1?4:0)+2-a.index],1,1,color);
-   int bar=(int)((a.w-12)*clampf(muted?0:d->levels[a.index],0,1));
-   rect(c,a.x+6,a.y+a.h-5,a.w-12,2,blend(p->bg,p->ink,60));
-   if(bar)rect(c,a.x+6,a.y+a.h-5,bar,2,on?p->stem[a.index]:color);
+   int bar=(int)((a.w-48)*clampf(muted?0:d->levels[a.index],0,1));
+   rect(c,a.x+6,a.y+a.h-10,a.w-48,4,blend(p->bg,p->ink,60));
+   if(bar)rect(c,a.x+6,a.y+a.h-10,bar,4,on?p->stem[a.index]:color);
+   char value[8];snprintf(value,sizeof(value),"%d%%",(int)(clampf(muted?0:d->levels[a.index],0,1)*100+.5f));
+   text(c,a.x+a.w-34,a.y+a.h-14,muted?"MUTE":value,1,5,color);
    if(d->stem_loading)text(c,a.x+8,a.y+24,"LOADING",1,(a.w-16)/6,p->alarm);
    continue;
   }
   if(d->bypass){rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->alarm,88));border(c,a.x,a.y,a.w,a.h,p->alarm);}
+  if(m->theme>=7)frame(c,m->theme,a,p->bg,d->bypass);
   text(c,a.x+8,a.y+3,a.label,2,(a.w-16)/12,color);
-  text(c,a.x+a.w-11,a.y+4,m->stem_bank?"H":"D",1,1,color);
-  text(c,a.x+8,a.y+25,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);
-  text(c,a.x+a.w-29,a.y+25,a.deck?"D2":"D1",1,3,color);
+  text(c,a.x+8,a.y+32,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);
+  text(c,a.x+a.w-29,a.y+32,a.deck?"D2":"D1",1,3,color);
  }
  return 1;
 }

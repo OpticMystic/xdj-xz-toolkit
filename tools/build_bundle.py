@@ -48,10 +48,10 @@ def main():
                                ("mods/audio/vendor/sha256/README.md", "sha256-public-domain.txt")):
             if (source / original).is_file():
                 shutil.copyfile(source / original, licenses / name)
-        roots = [source / "mods", source / "vendor/build/dfb-generated",
+        roots = [source / "mods", source / "vendor/tools/xz_gui", source / "vendor/build/dfb-generated",
                  source / "vendor/build/directfb-1.4-src/include", source / "vendor/build/directfb-1.4-src/lib"]
         files = [p for root in roots for p in root.rglob("*") if p.is_file() and
-                 "__pycache__" not in p.parts and (p.suffix in (".c", ".h", ".py", ".ld", ".md", ".txt", ".ttf", ".json", ".in") or p.name.startswith(("LICENSE", "COPYING")))]
+                 "__pycache__" not in p.parts and (p.suffix in (".c", ".h", ".py", ".ld", ".md", ".txt", ".ttf", ".json", ".in", ".png") or p.name.startswith(("LICENSE", "COPYING")))]
         files += [source / "vendor/tools/xz_runtime" / name for name in ("xz_directfb_hook.c", "mods_bridge.h", "orchestrator.sh")]
         with zipfile.ZipFile(output / "source.zip", "w", zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(set(files)):

@@ -38,8 +38,13 @@ def make_splash(preferred_font: pathlib.Path | None = None, logo_path: pathlib.P
     if logo_path is not None:
         with Image.open(logo_path) as source:
             supplied = source.convert("RGBA")
-        supplied.thumbnail((448, 448), Image.Resampling.LANCZOS)
+        supplied.thumbnail((480, 480), Image.Resampling.LANCZOS)
         image.paste(supplied, ((800-supplied.width)//2, (480-supplied.height)//2), supplied)
+        draw = ImageDraw.Draw(image)
+        draw.polygon([(0,0),(190,0),(202,30),(0,30)], fill=(27,39,52), outline=(168,206,255))
+        draw.text((12,2), "XZ MODS", font=_font(23,preferred_font), fill=WHITE)
+        draw.line((0,478,799,478), fill=(74,101,130), width=2)
+        draw.text((684,448), "LOADING", font=_font(21,preferred_font), fill=(168,206,255))
         return image
     draw = ImageDraw.Draw(image)
     draw.rectangle((0, 0, 799, 479), outline=AMBER, width=5)
@@ -56,17 +61,18 @@ def make_unloaded_logo(
 ) -> Image.Image:
     image = Image.new("RGB", (560, 92), BLACK)
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((2, 2, 557, 89), radius=14, outline=AMBER, width=3, fill=(4, 6, 8))
+    draw.polygon([(0,0),(544,0),(559,15),(559,91),(0,91)], fill=(10,17,24), outline=(168,206,255))
+    draw.line((106,8,106,83), fill=(65,89,114), width=1)
     if logo_path is None:
         _centered(draw, "XZ CUSTOM UI", 17, _font(45, preferred_font), AMBER, 560)
         return image
     supplied = Image.open(logo_path).convert("RGBA")
-    supplied.thumbnail((86, 86), Image.Resampling.LANCZOS)
-    logo_x = 12 + (86 - supplied.width) // 2
-    logo_y = 3 + (86 - supplied.height) // 2
+    supplied.thumbnail((92, 92), Image.Resampling.LANCZOS)
+    logo_x = 6 + (92 - supplied.width) // 2
+    logo_y = (92 - supplied.height) // 2
     image.paste(supplied, (logo_x, logo_y), supplied)
-    draw.text((112, 13), "XZ MODS", font=_font(36, preferred_font), fill=AMBER)
-    draw.text((114, 56), "RAM LOADER ACTIVE", font=_font(18, preferred_font), fill=WHITE)
+    draw.text((124, 3), "XZ MODS", font=_font(32, preferred_font), fill=WHITE)
+    draw.text((124, 43), "vj.tools/xzmods", font=_font(32, preferred_font), fill=(168,206,255))
     return image
 
 

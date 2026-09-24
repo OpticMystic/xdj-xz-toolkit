@@ -13,7 +13,7 @@ int main(void) {
         struct xz_ui panel;xz_ui_init(&panel);panel.deck=deck;panel.page=XZ_UI_STEMS;
         struct xz_ui_widget widgets[XZ_UI_WIDGETS];size_t count=xz_ui_layout(&panel,&m,widgets);int column=0;
         for(size_t i=0;i<count;i++)if(widgets[i].kind==XZ_UI_MUTE){assert(widgets[i].index==2-column);column++;}
-        assert(column==3);
+        assert(column==0); /* Full-screen menu no longer duplicates stem mixing. */
         for(int pad=0;pad<4;pad++){
             struct xz_ui u;xz_ui_init(&u);u.deck=1-deck;
             struct xz_ui_action actions[XZ_UI_ACTIONS];

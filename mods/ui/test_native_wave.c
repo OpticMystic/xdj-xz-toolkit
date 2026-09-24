@@ -28,8 +28,8 @@ int main(void) {
     assert(xz_native_wave_finish(&pair,&s,7,200,scratch,XZ_NATIVE_WAVE_PIXELS,draw,&success));
     assert(!pair.captured&&!pair.pixels&&calls==1);
     for(unsigned y=0;y<268;y++)for(unsigned x=0;x<536;x++){
-        uint16_t expected=(y>=92&&y<132)||(y>=224&&y<264)?0xabcd:
-            y<92||(y>=132&&y<224)?xz_wave_source_row(y,92):0;
+        uint16_t expected=(y>=84&&y<132)||(y>=216&&y<264)?0xabcd:
+            y<84||(y>=132&&y<216)?xz_wave_source_row(y,84):0;
         assert(pixels[y*536+x]==expected);
     }
     for(unsigned i=0;i<8;i++)assert(pixels[XZ_NATIVE_WAVE_PIXELS+i]==0xdead&&scratch[XZ_NATIVE_WAVE_PIXELS+i]==0xdead);

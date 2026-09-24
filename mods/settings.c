@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #define _POSIX_C_SOURCE 200809L
 #include "settings.h"
+#include "ui/themes.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@ void xz_settings_default(struct xz_settings *s) {
 }
 static int valid(const struct xz_settings *s) {
     return (unsigned)s->stems <= 1 && (unsigned)s->gate <= 1 &&
-        (unsigned)s->smart <= 1 && (unsigned)s->theme <= 6 &&
+        (unsigned)s->smart <= 1 && (unsigned)s->theme < XZ_THEME_COUNT &&
         (unsigned)s->stem_page <= 3 && (unsigned)s->shift_pages <= 1 &&
         (unsigned)s->pad_feedback <= 1 && (unsigned)s->shift_keysync <= 1 &&
         (unsigned)s->fb_takeover <= 1 && (unsigned)s->takeover_assign <= 2 && (unsigned)s->spare_eq <= 1 && (unsigned)s->stem_bank <= 1;
@@ -40,8 +41,14 @@ int xz_settings_parse(const char *text, struct xz_settings *out) {
         size_t size = strlen(keys[i]);
         if (strncmp(text,keys[i],size)) return -1;
         text += size;
-        if (*text < '0' || *text > '9' || text[1] != '\n') return -1;
-        *values[i] = *text-'0'; text += 2;
+        if (*text < '0' || *text > '9') return -1;
+        int value = *text++ - '0';
+        if (*text >= '0' && *text <= '9') {
+            if (!value) return -1;
+            value = value*10 + *text++ - '0';
+        }
+        if (*text++ != '\n') return -1;
+        *values[i] = value;
     }
     if (*text || !valid(&s)) return -1;
     *out = s; return 0;

@@ -28,6 +28,7 @@ def main():
     parser.add_argument("--pad-trace", action="store_true", help="Enable bounded in-memory physical-key diagnostics")
     parser.add_argument("--native-view", action="store_true", help="Start this RAM trial on the native deck view; the visible VJ.Tools button can reopen the stream")
     parser.add_argument("--stems", action="store_true", help="Enable prepared-stem discovery with native-audio alignment")
+    parser.add_argument("--ram-settings", action="store_true", help="Read existing preferences but keep all trial changes in RAM")
     parser.add_argument("--inline-observe", action="store_true", help="Observe the exact native wave lock without drawing")
     parser.add_argument("--settings-usb", help="Existing mounted XZ USB volume for persistent preferences")
     args = parser.parse_args()
@@ -125,6 +126,8 @@ def main():
         new_env += " XZ_MODS_INLINE=observe"
     if args.stems:
         new_env += " XZ_MODS_STEMS_FORCE=1"
+    if args.ram_settings:
+        new_env += " XZ_MODS_SETTINGS_READONLY=1"
     if args.settings_usb:
         new_env += " XZ_MODS_USB=" + shlex.quote(args.settings_usb)
     new_env += f" XZ_MODS_PAD_TRACE={int(args.pad_trace)}"
