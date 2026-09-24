@@ -1,6 +1,5 @@
 #include "ui.h"
 #include "stem_pads.h"
-#include "native_mixer_eq.h"
 #include "font_atlas.h"
 #include <stdio.h>
 #include <string.h>
@@ -106,7 +105,7 @@ void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active){
 }
 static void add(struct xz_ui_widget *w,size_t *n,int x,int y,int width,int height,
  enum xz_ui_action_kind kind,int index,uint32_t cap,const char *label){
- w[*n]=(struct xz_ui_widget){x,y,width,height,kind,index,cap,label};(*n)++;
+ w[*n]=(struct xz_ui_widget){x,y,width,height,kind,index,cap,label,-1};(*n)++;
 }
 const char *xz_ui_theme_name(int theme){return themes[theme>=0&&theme<7?theme:0];}
 uint32_t xz_ui_stem_color(int theme,int index){
@@ -153,7 +152,6 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
   add(w,&n,12,274,376,44,XZ_UI_SHIFT_PAGES,0,0,"SHIFT + PAGE BUTTONS");
   add(w,&n,12,328,376,44,XZ_UI_PAD_FEEDBACK,0,0,"PAD COLOR FEEDBACK");
   add(w,&n,12,382,376,44,XZ_UI_SHIFT_KEYSYNC,0,0,"SHIFT + SYNC");
-  add(w,&n,406,250,382,48,XZ_UI_SPARE_EQ,0,0,"SPARE CHANNEL STEM EQ");
  }else if(u->page==XZ_UI_THEMES){
   for(i=0;i<7;i++)add(w,&n,12+(i%3)*262,158+(i/3)*88,252,72,XZ_UI_SET_THEME,i,XZ_UI_THEME,themes[i]);
  }else if(u->page==XZ_UI_CONNECTION){
@@ -168,7 +166,6 @@ size_t xz_ui_layout(const struct xz_ui *u,const struct xz_ui_model *m,struct xz_
 }
 static int ready(const struct xz_ui_model *m,int deck,const struct xz_ui_widget *w){
  const struct xz_ui_deck *d=&m->deck[deck];
- if(w->kind==XZ_UI_SPARE_EQ)return m->eq_available||m->spare_eq;
  if(w->kind==XZ_UI_CONNECTION_ENABLE)return m->connection.ready&&m->connection.can_enable;
  if(w->kind==XZ_UI_DISCOVERY)return m->connection.ready&&m->connection.can_discover;
  uint32_t available=d->ready;
@@ -200,7 +197,6 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   if(a.kind==XZ_UI_SHIFT_PAGES)selected=m->shift_pages;
   if(a.kind==XZ_UI_PAD_FEEDBACK)selected=m->pad_feedback;
   if(a.kind==XZ_UI_SHIFT_KEYSYNC)selected=m->shift_keysync;
-  if(a.kind==XZ_UI_SPARE_EQ)selected=m->spare_eq;
   if(a.kind==XZ_UI_STEM_BANK)selected=m->stem_bank==a.index;
   if(a.kind==XZ_UI_TAKEOVER_TOGGLE){color=0x52d794;selected=m->fb_takeover!=0;}
   if(a.kind==XZ_UI_TAKEOVER_ASSIGN)selected=a.index==m->takeover_assign;
@@ -252,7 +248,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
     rect(c,a.x+a.w-63,a.y+10,55,17,p->alarm);
     text(c,a.x+a.w-58,a.y+13,"MUTED",1,9,p->bg);
    }
-   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE||a.kind==XZ_UI_SPARE_EQ)
+   if(a.kind==XZ_UI_SHIFT_PAGES||a.kind==XZ_UI_PAD_FEEDBACK||a.kind==XZ_UI_SHIFT_KEYSYNC||a.kind==XZ_UI_TAKEOVER_TOGGLE)
     text(c,a.x+a.w-40,a.y+18,selected?"ON":"OFF",1,6,selected?p->accent:dim);
    if(a.kind==XZ_UI_ENABLE)text(c,a.x+a.w-78,a.y+16,!available?"NOT READY":selected?"ON":"OFF",1,12,available&&selected?p->accent:dim);
    if(a.kind==XZ_UI_CONNECTION_ENABLE||a.kind==XZ_UI_DISCOVERY)
@@ -279,13 +275,12 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
  }else if(u->page==XZ_UI_SETTINGS){text(c,398,258,"KEY CONTROL",1,62,dim);text(c,398,348,"STEM AND CUE SETTINGS APPLY TO BOTH DECKS",1,62,p->ink);text(c,398,369,"UNAVAILABLE CONTROLS ARE MARKED NOT READY",1,62,dim);}
  else if(u->page==XZ_UI_CONTROLS){
   text(c,12,149,"ADDITIONAL STEMS PAD PAGE",2,40,p->ink);
-  text(c,406,230,m->stem_bank?"E VOCALS / F MUSIC / G DRUMS / H BYPASS":"A VOCALS / B MUSIC / C DRUMS / D BYPASS",1,63,dim);
-  text(c,406,311,"CH3 -> DECK 1 / CH4 -> DECK 2",1,63,p->ink);
-  text(c,406,331,"HIGH VOCALS / MID HARMONICS / LOW DRUMS",1,63,dim);
-  const char *eq_status=m->eq_status==XZ_EQ_ACTIVE?"ACTIVE - TURN KNOB THROUGH CURRENT LEVEL":m->eq_status==XZ_EQ_SOURCE?"LOAD USB TRACKS / LINK OR PC SUSPENDS EQ":m->eq_status==XZ_EQ_EXTERNAL?"SUSPENDED: SELECT PC ON SPARE CHANNELS":m->eq_status==XZ_EQ_WAITING?"WAITING: MOVE A SPARE EQ KNOB":m->eq_status==XZ_EQ_UNAVAILABLE?"EQ DISABLED: SAFE MIDI INPUT REQUIRED":"OFF";
-  text(c,406,353,eq_status,1,63,p->accent);
-  text(c,406,374,"CENTRE = FULL / LEFT = SILENT / NO BOOST",1,63,dim);
-  text(c,406,395,"EXTERNAL INPUTS SUSPEND THEIR STEM CONTROL",1,63,dim);
+  text(c,406,230,m->stem_bank?"E VOCALS / F HARMONICS / G DRUMS / H BYPASS":"A VOCALS / B HARMONICS / C DRUMS / D BYPASS",1,63,dim);
+  text(c,406,275,"TWO-DECK STEM CONTROLS",2,31,p->ink);
+  text(c,406,311,"FOUR BUTTONS UNDER EACH WAVEFORM",1,62,dim);
+  text(c,406,338,"VOCALS / HARMONICS / DRUMS / BYPASS",1,62,p->ink);
+  text(c,406,365,"TAP A STEM TO MUTE; DRAG TO SET LEVEL",1,62,dim);
+  text(c,406,392,"DECKS STAY SEPARATE ON THE PLAY SCREEN",1,62,dim);
   text(c,12,430,m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS",1,115,p->ink);
  }
  else if(u->page==XZ_UI_THEMES)text(c,282,361,"ORIGINAL + SIX UPSTREAM THEMES",1,70,dim);
@@ -326,26 +321,27 @@ size_t xz_ui_cancel(struct xz_ui *u,struct xz_ui_action out[XZ_UI_ACTIONS]){
  u->held_kind=XZ_UI_NONE;u->capture=-1;u->down=0;u->dragged=0;return n;
 }
 static size_t touch_widgets(struct xz_ui *u,const struct xz_ui_model *m,int x,int y,int down,struct xz_ui_action out[XZ_UI_ACTIONS],const struct xz_ui_widget *w,size_t count){
- struct xz_ui_widget a;size_t n,i;const struct xz_ui_deck *d;int press;
+ struct xz_ui_widget a;size_t n,i;const struct xz_ui_deck *d;int press,deck;
  if(!u||!m||!out||u->deck<0||u->deck>3)return 0;
  if(!down)return xz_ui_cancel(u,out);
- press=!u->down;u->down=1;n=0;d=&m->deck[u->deck];
+ press=!u->down;u->down=1;n=0;
  if(press){u->capture=-1;for(i=0;i<count;i++)if(x>=w[i].x&&x<w[i].x+w[i].w&&y>=w[i].y&&y<w[i].y+w[i].h){u->capture=(int)i;break;}}
  if(u->capture<0||(size_t)u->capture>=count)return 0;a=w[u->capture];
- if(!ready(m,u->deck,&a)){
+ deck=a.deck>=0?a.deck:u->deck;d=&m->deck[deck];
+ if(!ready(m,deck,&a)){
   if(!press)return 0;
   if(a.kind==XZ_UI_CONNECTION_ENABLE||a.kind==XZ_UI_DISCOVERY)snprintf(u->notice,sizeof(u->notice),"%s CONTROL IS NOT AVAILABLE",a.label);
   else snprintf(u->notice,sizeof(u->notice),"%s / NOT READY - CHECK FEATURE, MEDIA AND RUNTIME",a.label[0]?a.label:"CONTROL");
-  out[n++]=action(XZ_UI_UNAVAILABLE,XZ_UI_PRESS,u->deck,(int)a.requires,0,0);return n;
+  out[n++]=action(XZ_UI_UNAVAILABLE,XZ_UI_PRESS,deck,(int)a.requires,0,0);return n;
  }
  if(press)u->notice[0]=0;
- if(a.kind==XZ_UI_LEVEL||a.kind==XZ_UI_VOLUME){out[n++]=action(a.kind,press?XZ_UI_PRESS:XZ_UI_MOVE,u->deck,a.index,clampf((float)(x-a.x-8)/(float)(a.w-16),0,1),0);return n;}
+ if(a.kind==XZ_UI_LEVEL||a.kind==XZ_UI_VOLUME){out[n++]=action(a.kind,press?XZ_UI_PRESS:XZ_UI_MOVE,deck,a.index,clampf((float)(x-a.x-8)/(float)(a.w-16),0,1),0);return n;}
  if(a.kind==XZ_UI_STRIP){static const float beats[6]={.0625f,.125f,.25f,.5f,1,2};int column=(int)clampf((float)(x-a.x)/96,0,5);float pitch=clampf(12-24*(float)(y-a.y)/(float)(a.h-1),-12,12);
-  u->held_kind=a.kind;u->held_deck=u->deck;u->held_index=column;out[n++]=action(a.kind,press?XZ_UI_PRESS:XZ_UI_MOVE,u->deck,column,beats[column],pitch);return n;}
+  u->held_kind=a.kind;u->held_deck=deck;u->held_index=column;out[n++]=action(a.kind,press?XZ_UI_PRESS:XZ_UI_MOVE,deck,column,beats[column],pitch);return n;}
  if(!press)return 0;
  if(a.kind==XZ_UI_PANEL){enum xz_ui_page old=u->page;u->page=(enum xz_ui_page)a.index;u->capture=-1;out[n++]=action(a.kind,XZ_UI_PRESS,u->deck,(int)old,(float)u->page,0);}
  else if(a.kind==XZ_UI_DECK){int old=u->deck;u->deck=a.index;u->capture=-1;out[n++]=action(a.kind,XZ_UI_PRESS,old,a.index,0,0);}
- else if(a.kind==XZ_UI_MUTE||a.kind==XZ_UI_SAMPLE_PAD||a.kind==XZ_UI_HOTCUE_PAD){u->held_kind=a.kind;u->held_deck=u->deck;u->held_index=a.index;out[n++]=action(a.kind,XZ_UI_PRESS,u->deck,a.index,1,0);}
+ else if(a.kind==XZ_UI_MUTE||a.kind==XZ_UI_SAMPLE_PAD||a.kind==XZ_UI_HOTCUE_PAD){u->held_kind=a.kind;u->held_deck=deck;u->held_index=a.index;out[n++]=action(a.kind,XZ_UI_PRESS,deck,a.index,1,0);}
  else{float value=1;
   switch(a.kind){case XZ_UI_ENABLE:value=(m->enabled&(uint32_t)a.index)?0:1;break;case XZ_UI_BYPASS:value=d->bypass?0:1;break;
   case XZ_UI_HOLD:value=d->hold?0:1;break;case XZ_UI_OVERDUB:value=d->overdub?0:1;break;case XZ_UI_SERVER_AUTO:value=m->server_auto?0:1;break;
@@ -353,12 +349,11 @@ static size_t touch_widgets(struct xz_ui *u,const struct xz_ui_model *m,int x,in
   case XZ_UI_SHIFT_PAGES:value=m->shift_pages?0:1;break;
   case XZ_UI_PAD_FEEDBACK:value=m->pad_feedback?0:1;break;
   case XZ_UI_SHIFT_KEYSYNC:value=m->shift_keysync?0:1;break;
-  case XZ_UI_SPARE_EQ:value=m->spare_eq?0:1;break;
   case XZ_UI_TAKEOVER_TOGGLE:value=m->fb_takeover?0:1;break;
   case XZ_UI_TAKEOVER_ASSIGN:value=(float)a.index;break;
   case XZ_UI_STEM_PAGE:value=(float)a.index;break;
   case XZ_UI_KEY_SHIFT:value=(float)a.index;break;case XZ_UI_SET_THEME:value=(float)a.index;break;default:break;}
-  out[n++]=action(a.kind,XZ_UI_PRESS,u->deck,a.index,value,0);
+  out[n++]=action(a.kind,XZ_UI_PRESS,deck,a.index,value,0);
  }
  return n;
 }
@@ -368,15 +363,15 @@ size_t xz_ui_touch(struct xz_ui *u,const struct xz_ui_model *m,int x,int y,int d
  size_t count=xz_ui_layout(u,m,w);
  return touch_widgets(u,m,x,y,down,out,w,count);
 }
-size_t xz_ui_inline_layout(const struct xz_ui *u,int width,int height,struct xz_ui_widget *w){
+size_t xz_ui_inline_layout(const struct xz_ui *u,int width,int height,struct xz_ui_widget w[XZ_UI_WIDGETS]){
  size_t n=0;
- if(width<400||width>800||height<48||height>96||u->deck<0||u->deck>1)return 0;
- add(w,&n,0,2,40,height-4,XZ_UI_DECK,1-u->deck,0,u->deck?"D2":"D1");
- add(w,&n,width-56,2,56,height-4,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
- for(int i=0;i<3;i++){
-  int stem=xz_stem_for_pad(i);
-  int x=42+(width-100)*i/3,end=42+(width-100)*(i+1)/3;
-  add(w,&n,x,2,end-x-2,height-4,XZ_UI_MUTE,stem,XZ_UI_STEM,stems[stem]);
+ if(width<400||width>800||height!=64||u->deck<0||u->deck>1)return 0;
+ for(int deck=0;deck<2;deck++)for(int slot=0;slot<4;slot++){
+  int x=width*slot/4,end=width*(slot+1)/4;
+  int stem=slot<3?xz_stem_for_pad(slot):0;
+  add(w,&n,x+1,deck*32+1,end-x-2,30,slot<3?XZ_UI_MUTE:XZ_UI_BYPASS,
+      stem,XZ_UI_STEM,slot<3?stems[stem]:"BYPASS");
+  w[n-1].deck=deck;
  }
  return n;
 }
@@ -386,9 +381,9 @@ size_t xz_ui_inline_touch(struct xz_ui *u,const struct xz_ui_model *m,int width,
  size_t count=xz_ui_inline_layout(u,width,height,w);
  if(down&&!u->down)for(size_t i=0;i<count;i++){
   struct xz_ui_widget a=w[i];
-  if(a.kind==XZ_UI_MUTE&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h&&ready(m,u->deck,&a)){
-   u->down=1;u->capture=(int)i;u->held_kind=XZ_UI_MUTE;u->held_deck=u->deck;u->held_index=a.index;
-   u->touch_start_x=x;u->touch_start_level=m->deck[u->deck].levels[a.index];u->dragged=0;return 0;
+  if(a.kind==XZ_UI_MUTE&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h&&ready(m,a.deck,&a)){
+   u->down=1;u->capture=(int)i;u->held_kind=XZ_UI_MUTE;u->held_deck=a.deck;u->held_index=a.index;
+   u->touch_start_x=x;u->touch_start_level=m->deck[a.deck].levels[a.index];u->dragged=0;return 0;
   }
  }
  if(u->held_kind==XZ_UI_MUTE&&u->capture>=0&&(size_t)u->capture<count){
@@ -409,10 +404,10 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
  size_t n=xz_ui_inline_layout(u,width,height,w);if(!n)return 0;
  struct canvas c={pixels,stride,width,height};
  const struct palette *p=&palettes[m->theme>=0&&m->theme<7?m->theme:0];
- const struct xz_ui_deck *d=&m->deck[u->deck];
  rect(c,0,0,width,height,p->bg);
  for(size_t i=0;i<n;i++){
-  struct xz_ui_widget a=w[i];int available=ready(m,u->deck,&a);
+  struct xz_ui_widget a=w[i];const struct xz_ui_deck *d=&m->deck[a.deck];
+  int available=ready(m,a.deck,&a);
   int muted=a.kind==XZ_UI_MUTE&&(d->muted&(1u<<a.index));
   uint32_t color=available?p->ink:blend(p->bg,p->ink,100);
   rect(c,a.x,a.y,a.w,a.h,blend(p->bg,p->ink,22));
@@ -421,29 +416,19 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
    int on=available&&!muted&&d->levels[a.index]>0;
    rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->stem[a.index],on?150:32));
    border(c,a.x,a.y,a.w,a.h,available?p->stem[a.index]:color);
-   text(c,a.x+8,a.y+7,a.label,2,(a.w-16)/12,color);
-   text(c,a.x+a.w-10,a.y+6,pads[(m->stem_bank==1?4:0)+2-a.index],1,1,color);
+   text(c,a.x+8,a.y+3,a.label,2,(a.w-16)/12,color);
+   text(c,a.x+a.w-11,a.y+4,pads[(m->stem_bank==1?4:0)+2-a.index],1,1,color);
    int bar=(int)((a.w-12)*clampf(muted?0:d->levels[a.index],0,1));
-   rect(c,a.x+6,a.y+a.h-8,a.w-12,4,blend(p->bg,p->ink,60));
-   if(bar)rect(c,a.x+6,a.y+a.h-8,bar,4,on?p->stem[a.index]:color);
-   if(d->stem_loading)text(c,a.x+8,a.y+30,"LOADING",1,(a.w-16)/6,p->alarm);
+   rect(c,a.x+6,a.y+a.h-5,a.w-12,2,blend(p->bg,p->ink,60));
+   if(bar)rect(c,a.x+6,a.y+a.h-5,bar,2,on?p->stem[a.index]:color);
+   if(d->stem_loading)text(c,a.x+8,a.y+17,"LOADING",1,(a.w-16)/6,p->alarm);
    continue;
   }
-  if(a.kind==XZ_UI_LEVEL){
-   int y=a.y+a.h/2;
-   rect(c,a.x+8,y-1,a.w-16,2,color);
-   for(int tick=0;tick<5;tick++)rect(c,a.x+8+(a.w-16)*tick/4,y-3,1,7,color);
-   int value=(int)(clampf(d->levels[a.index],0,1)*(a.w-16));
-   rect(c,a.x+8+value-2,y-6,4,13,available?p->ink:color);
-   rect(c,a.x+8+value-2,y-6,4,3,available?p->stem[a.index]:color);
-  }else{
-   if(a.kind==XZ_UI_MUTE)rect(c,a.x,a.y,a.w,2,available?p->stem[a.index]:color);
-   if(muted||(a.kind==XZ_UI_BYPASS&&d->bypass))border(c,a.x,a.y,a.w,a.h,p->alarm);
-   if(a.kind==XZ_UI_DECK){text(c,a.x+6,a.y+8,"DECK",1,5,color);text(c,a.x+14,a.y+28,u->deck?"2":"1",2,2,color);}
-   else text(c,a.x+4,a.y+8,a.label,1,(a.w-8)/6,color);
-   if(a.kind==XZ_UI_BYPASS){text(c,a.x+7,a.y+32,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);text(c,a.x+a.w-9,a.y+8,m->stem_bank?"H":"D",1,1,color);}
-   if(muted)text(c,a.x+a.w-42,a.y+8,"MUTE",1,6,p->alarm);
-  }
+  if(d->bypass){rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->alarm,88));border(c,a.x,a.y,a.w,a.h,p->alarm);}
+  text(c,a.x+8,a.y+3,a.label,2,(a.w-16)/12,color);
+  text(c,a.x+a.w-11,a.y+4,m->stem_bank?"H":"D",1,1,color);
+  text(c,a.x+8,a.y+18,d->bypass?"ON":"OFF",1,6,d->bypass?p->alarm:color);
+  text(c,a.x+a.w-29,a.y+18,a.deck?"D2":"D1",1,3,color);
  }
  return 1;
 }

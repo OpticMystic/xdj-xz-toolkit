@@ -22,7 +22,7 @@ enum xz_ui_action_kind {
     XZ_UI_SET_THEME, XZ_UI_SERVER_AUTO, XZ_UI_SERVER_ADDRESS, XZ_UI_KEY_SHIFT,
     XZ_UI_KEY_SYNC, XZ_UI_HOTCUE_PAD, XZ_UI_CONNECTION_ENABLE, XZ_UI_DISCOVERY,
     XZ_UI_STEM_PAGE, XZ_UI_SHIFT_PAGES, XZ_UI_PAD_FEEDBACK, XZ_UI_SHIFT_KEYSYNC,
-    XZ_UI_TAKEOVER_TOGGLE, XZ_UI_TAKEOVER_ASSIGN, XZ_UI_STEMS_OVERLAY, XZ_UI_SPARE_EQ, XZ_UI_STEM_BANK
+    XZ_UI_TAKEOVER_TOGGLE, XZ_UI_TAKEOVER_ASSIGN, XZ_UI_STEMS_OVERLAY, XZ_UI_STEM_BANK
 };
 enum xz_ui_phase { XZ_UI_PRESS, XZ_UI_MOVE, XZ_UI_RELEASE };
 struct xz_ui_action {
@@ -60,7 +60,7 @@ struct xz_ui_model {
     struct xz_ui_connection connection;
     int stem_page, shift_pages, pad_feedback, shift_keysync;
     int fb_takeover, takeover_assign, stems_overlay;
-    int spare_eq, eq_available, stem_bank; unsigned eq_status, eq_allowed;
+    int stem_bank;
     const char *settings_status;
 };
 struct xz_ui {
@@ -78,6 +78,7 @@ struct xz_ui_widget {
     int index;
     uint32_t requires;
     const char *label;
+    int deck;
 };
 void xz_ui_init(struct xz_ui *ui);
 /* The model is a runtime snapshot. Rendering and touch never change it. */

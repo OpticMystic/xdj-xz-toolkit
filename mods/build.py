@@ -74,7 +74,7 @@ def main() -> None:
                "-Wl,-T," + str(ROOT / "xz-relocations.ld"),
                str(ROOT / "runtime.c"), str(ROOT / "cue/cue.c"), str(ROOT / "cue/native.c"),
                str(ROOT / "ui_runtime.c"), str(ROOT / "ui/ui.c"), str(ROOT / "ui/native_touch.c"),
-               str(ROOT / "ui/stem_pads.c"), str(ROOT / "ui/mixer_eq.c"), str(ROOT / "ui/native_mixer_eq.c"),
+               str(ROOT / "ui/stem_pads.c"),
                str(ROOT / "ui/native_led.c"),
                str(ROOT / "ui/native_wave.c"),
                str(ROOT / "ui/native_wave_runtime.c"),

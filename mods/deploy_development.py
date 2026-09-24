@@ -26,7 +26,6 @@ def main():
     parser.add_argument("--previous-bundle", type=Path, help="Verified bundle used by the normal combined USB loader")
     parser.add_argument("--fast-transfer", action="store_true", help="Use the already installed private RAM transfer helper")
     parser.add_argument("--pad-trace", action="store_true", help="Enable bounded in-memory physical-key diagnostics")
-    parser.add_argument("--spare-eq", action="store_true", help="Enable the spare-channel EQ option for this RAM trial; hardware input lockouts remain active")
     parser.add_argument("--native-view", action="store_true", help="Start this RAM trial on the native deck view; the visible VJ.Tools button can reopen the stream")
     parser.add_argument("--stems", action="store_true", help="Enable prepared-stem discovery with native-audio alignment")
     parser.add_argument("--inline-observe", action="store_true", help="Observe the exact native wave lock without drawing")
@@ -129,8 +128,6 @@ def main():
     if args.settings_usb:
         new_env += " XZ_MODS_USB=" + shlex.quote(args.settings_usb)
     new_env += f" XZ_MODS_PAD_TRACE={int(args.pad_trace)}"
-    if args.spare_eq:
-        new_env += " XZ_MODS_SPARE_EQ_FORCE=1"
     if args.native_view:
         new_env += " XZ_MODS_NATIVE_VIEW=1"
     script = f'''#!/bin/sh

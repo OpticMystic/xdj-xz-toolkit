@@ -14,14 +14,14 @@ int main(void) {
         for(size_t i=0;i<count;i++)if(widgets[i].kind==XZ_UI_MUTE){assert(widgets[i].index==2-column);column++;}
         assert(column==3);
         for(int pad=0;pad<4;pad++){
-            struct xz_ui u;xz_ui_init(&u);u.deck=deck;
+            struct xz_ui u;xz_ui_init(&u);u.deck=1-deck;
             struct xz_ui_action actions[XZ_UI_ACTIONS];
             struct xz_stem_pads state={0};
             struct xz_cue_event e={deck,pad,0,1,0,0,0,-1,0};int toggle=-1;
             assert(xz_stem_pad_event(&state,&e,1,&toggle)&&toggle==(pad<3?2-pad:3));
-            int x=pad<3?120+150*pad:510;
-            size_t n=xz_ui_inline_touch(&u,&m,536,64,x,12,1,actions);
-            if(!n)n=xz_ui_inline_touch(&u,&m,536,64,x,12,0,actions);
+            int x=pad*134+60,y=deck*32+12;
+            size_t n=xz_ui_inline_touch(&u,&m,536,64,x,y,1,actions);
+            if(!n)n=xz_ui_inline_touch(&u,&m,536,64,x,y,0,actions);
             assert(n==1);
             if(pad<3){
                 if(actions[0].kind!=XZ_UI_MUTE||actions[0].index!=toggle){

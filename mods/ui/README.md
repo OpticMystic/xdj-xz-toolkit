@@ -119,31 +119,23 @@ banks, inactive-bank hot cues and release ownership across bank changes.
 ownership and display bounds.
 Physical acceptance of each new runtime remains separate from these tests.
 
-## Spare channel stem EQ
+## Two-deck stem controls on the native screen
 
-The published 0.1.2 runtime does not control stems from the spare EQ knobs on
-the physical XZ. A live CH3 HIGH sweep produced MIDI on the separate mixer USB
-endpoint, while the player hook received no reports. Keep the setting visible,
-but treat it as unavailable until a qualified native input path is installed.
-The XZ Utility's Mixer MIDI Message setting changes the computer USB output;
-it does not deliver those events to the rooted player.
+The 536x268 native waveform window keeps both deck waveforms. It places a
+32-pixel control row immediately after each waveform. Every row has four
+buttons in the same order as the physical stem pad bank: Vocals, Harmonics,
+Drums, and Bypass. Eight touch targets stay visible together on the play
+screen, with no deck-switch button.
 
-An offline RAM-only candidate would read the mixer's validated status packet.
-It expects the mixer CPU to publish the six ordinary ADC values to that packet.
-Stock mixer firmware does not do this. The candidate has not been installed in
-the tracked runtime, loaded on the XZ or qualified on hardware. The standalone
-release contains no such patch.
+Tap a stem to mute it. Drag horizontally inside a stem button to set its
+level. A held touch keeps its starting deck and stem when it crosses a row
+boundary. Touches that begin on either waveform stay with the native waveform
+gesture. Bypass applies only to its own deck.
 
-The intended mapping is CH3 to Deck 1 and CH4 to Deck 2, with HIGH for Vocals,
-MID for Harmonics and LOW for Drums. Centre and clockwise positions retain full
-volume; turning left fades to zero. Pickup prevents a gain jump. A local USB
-track and PC selected on the corresponding spare channel remain required;
-external inputs and unsupported deck sources suspend control. These rules pass
-isolated tests, but physical EQ audio and normal-mixer acceptance remain open.
-
-The factory volume-test mode exposes ADC values but stops normal mixer work.
-Clearing its flag does not restore those tasks. Do not use it as a performance
-input source. The RAM candidate never requests this mode.
+The MODS panel keeps the pad-bank and show settings. Closing it or hiding the
+inline rows does not change active stem levels or physical pad assignments.
+The dual-row layout has portable render and touch checks; hardware audio and
+screen acceptance must be recorded separately.
 
 ## Enter and leave the VJ.Tools view
 

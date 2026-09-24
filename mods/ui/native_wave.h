@@ -5,8 +5,10 @@
 #include <stdint.h>
 
 #define XZ_NATIVE_WAVE_PIXELS (536u * 268u)
-#define XZ_NATIVE_WAVE_STRIP_Y 204u
-#define XZ_NATIVE_WAVE_STRIP_HEIGHT 64u
+#define XZ_NATIVE_WAVE_ROW1_Y 100u
+#define XZ_NATIVE_WAVE_ROW2_Y 232u
+#define XZ_NATIVE_WAVE_ROW_HEIGHT 32u
+#define XZ_NATIVE_WAVE_ROWS_PIXELS (536u * XZ_NATIVE_WAVE_ROW_HEIGHT * 2u)
 
 /* Values read by the hook adapter from the qualified 1.26 addresses.
    The adapter must revoke touch geometry whenever this snapshot stops passing

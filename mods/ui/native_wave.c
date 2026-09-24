@@ -3,6 +3,8 @@
 #include "wave_viewport.h"
 #include <string.h>
 
+static _Thread_local uint16_t rows[XZ_NATIVE_WAVE_ROWS_PIXELS];
+
 int xz_native_wave_scene_valid(const struct xz_native_wave_scene *s) {
     return s && s->enabled && !s->panel_open &&
         s->window_table == 0x4d200cu && s->control_table == 0x4d1f30u &&
@@ -38,8 +40,10 @@ int xz_native_wave_finish(struct xz_native_wave_pair *p,const struct xz_native_w
     if(a>UINTPTR_MAX-bytes || b>UINTPTR_MAX-bytes || (a<b+bytes && b<a+bytes))return 0;
     memcpy(scratch,saved.pixels,bytes);
     if(!xz_wave_compact(scratch,XZ_NATIVE_WAVE_PIXELS,536,100) ||
-        !render(context,scratch+536*XZ_NATIVE_WAVE_STRIP_Y,
-                536*XZ_NATIVE_WAVE_STRIP_HEIGHT,536,536,64))return 0;
+        !render(context,rows,XZ_NATIVE_WAVE_ROWS_PIXELS,536,536,64))return 0;
+    memcpy(scratch+536*XZ_NATIVE_WAVE_ROW1_Y,rows,536*XZ_NATIVE_WAVE_ROW_HEIGHT*sizeof(*rows));
+    memcpy(scratch+536*XZ_NATIVE_WAVE_ROW2_Y,rows+536*XZ_NATIVE_WAVE_ROW_HEIGHT,
+           536*XZ_NATIVE_WAVE_ROW_HEIGHT*sizeof(*rows));
     memcpy(saved.pixels,scratch,bytes);
     return 1;
 }
