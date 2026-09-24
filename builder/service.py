@@ -21,12 +21,14 @@ def status():
     manifest=json.loads(runtime.read_text()) if runtime.exists() else None
     catalog_path=Path(__file__).with_name('models.json')
     catalog=json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
-    return {'name':'XZ Mods','version':'0.1.0-preview','firmware':'XDJ-XZ 1.26',
+    return {'name':'XZ Mods','version':'0.1.1-preview','firmware':'XDJ-XZ 1.26',
+        'prepared_formats':['overcue-stems/4','stemd-cache/1'],
+        'separation_output_format':'stemd-cache/1',
         'release_ready':False,'runtime_present':manifest is not None,'runtime':manifest,
         'vjtools_required':False,'vjtools_connection':True,'engines':catalog,
         'limits':{'sample_rate':44100,'channels':2,'source_formats':['WAV','FLAC'],
                   'max_stem_pcm_bytes':cache.MAX_PCM_BYTES},
-        'release_gates':['Physical pad/audio retest','Native inline UI integration',
+        'release_gates':['Physical pad/audio retest','Native inline UI acceptance',
             'Fresh boot and two-deck qualification','Real model execution and cache timing tests',
             'Packaged dependency/source notices audit']}
 
@@ -91,6 +93,11 @@ def inspect_cache_entry(entry,source):
 def dispatch(request,job):
     method=request.get('method')
     if method=='status':return status()
+    if method=='inspect_overcue':
+        source=cache._regular(request['source'])
+        job.progress('verify','Checking the OverCue source identity and every prepared audio page')
+        output=job.run([resources()/'xz-overcue-check.exe',source])
+        return json.loads(output)
     if method=='download_firmware':
         from .engines import data_root,download
         record={'filename':'XDJXZ_v126.zip','url':'https://downloads.support.alphatheta.com/firmwares/all-in-one-dj-systems/XDJ-XZ/XDJXZ_v126.zip',

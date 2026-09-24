@@ -9,7 +9,8 @@ enum xz_audio_state {
     XZ_AUDIO_SOURCE_UNSUPPORTED, XZ_AUDIO_CACHE_MISSING,
     XZ_AUDIO_CACHE_AMBIGUOUS, XZ_AUDIO_DECODING, XZ_AUDIO_DECODE_FAILED,
     XZ_AUDIO_ALIGNMENT_BLOCKED, XZ_AUDIO_EXPERIMENTAL_READY,
-    XZ_AUDIO_HOOK_FAILED, XZ_AUDIO_DISABLED, XZ_AUDIO_CACHE_CHOICE_INVALID
+    XZ_AUDIO_HOOK_FAILED, XZ_AUDIO_DISABLED, XZ_AUDIO_CACHE_CHOICE_INVALID,
+    XZ_AUDIO_PREPARED_ALIGNING, XZ_AUDIO_PREPARED_BUFFERING, XZ_AUDIO_PREPARED_ERROR
 };
 struct xz_audio_status {
     enum xz_audio_state state;
@@ -20,12 +21,15 @@ struct xz_audio_status {
     uint32_t skipped_blocks;
     size_t pcm_bytes;
     char path[1024];
+    int prepared, alignment_frames;
+    float alignment_correlation;
 };
 int xz_audio_start(void);
 void xz_audio_stop(void);
 void xz_audio_set_enabled(int enabled);
 void xz_audio_set_levels(int deck, struct xz_stem_levels levels);
 int xz_audio_get_status(int deck, struct xz_audio_status *out);
+int xz_audio_waveform(int deck, unsigned role, unsigned char *bins, size_t count, float *progress);
 /* Audio-thread lookup for a manager captured by the successful load snapshot.
  * Atomic 32-bit reads only. The returned generation changes only for a true
  * stream discontinuity: load, unload, or runtime stop. Stem enable/disable does

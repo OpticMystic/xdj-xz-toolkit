@@ -51,7 +51,7 @@ class TakeoverModTests(unittest.TestCase):
         ui_h = (MODS / "ui/ui.h").read_text(encoding="utf-8")
         self.assertIn("XZ_UI_TAKEOVER_TOGGLE", ui_h)
         self.assertIn("XZ_UI_TAKEOVER_ASSIGN", ui_h)
-        self.assertIn("int fb_takeover, takeover_assign;", ui_h)
+        self.assertIn("int fb_takeover, takeover_assign, stems_overlay;", ui_h)
         self.assertIn("void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active);", ui_h)
 
     def test_native_touch_vj_button_interception(self):

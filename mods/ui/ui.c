@@ -89,6 +89,12 @@ void xz_ui_render_badge(uint16_t *pixels,size_t stride){
  rect(c,744,0,56,24,0x15191e);border(c,744,0,56,24,0xa8ceff);
  text(c,751,5,"MODS",2,4,0xf4f5f6);
 }
+void xz_ui_render_stems_button(uint16_t *pixels,size_t stride,int enabled){
+ if(!pixels||stride<800)return;
+ struct canvas c={pixels,stride,800,480};uint32_t color=enabled?0x52d794:0xa8ceff;
+ rect(c,674,0,68,24,enabled?0x123c2a:0x15191e);border(c,674,0,68,24,color);
+ text(c,681,5,"STEMS",2,5,color);
+}
 void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active){
  if(!pixels||stride<800)return;
  struct canvas c={pixels,stride,800,480};
@@ -159,7 +165,10 @@ static int ready(const struct xz_ui_model *m,int deck,const struct xz_ui_widget 
  const struct xz_ui_deck *d=&m->deck[deck];
  if(w->kind==XZ_UI_CONNECTION_ENABLE)return m->connection.ready&&m->connection.can_enable;
  if(w->kind==XZ_UI_DISCOVERY)return m->connection.ready&&m->connection.can_discover;
- if(w->requires && (d->ready&w->requires)!=w->requires)return 0;
+ uint32_t available=d->ready;
+ if(w->kind==XZ_UI_ENABLE&&(w->index==XZ_UI_STEM||w->index==XZ_UI_GATE||w->index==XZ_UI_SMART))
+  available=m->deck[0].ready|m->deck[1].ready;
+ if(w->requires && (available&w->requires)!=w->requires)return 0;
  switch(w->kind){
  case XZ_UI_LEVEL:case XZ_UI_MUTE:case XZ_UI_BYPASS:return (m->enabled&XZ_UI_STEM)!=0;
  case XZ_UI_GROOVE_PAD:return (m->enabled&XZ_UI_STEM)&&(d->groove_loaded&(1u<<w->index));
@@ -257,11 +266,11 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   rect(c,12,197,776,1,blend(p->bg,p->ink,40));
   if(d->wave_peaks&&d->wave_count){size_t j;for(j=0;j<d->wave_count&&j<388;j++){int x=12+(int)(j*776/d->wave_count);int h=d->wave_peaks[j]*40/255;rect(c,x,198-h/2,2,h,p->accent);}}
   else {rect(c,295,186,212,22,p->bg);text(c,306,191,"WAVEFORM NOT AVAILABLE",1,35,dim);}
-  if(u->page==XZ_UI_STEMS){text(c,12,317,"GROOVE CIRCUIT",2,28,p->ink);text(c,190,322,"BANK A-H",1,20,dim);text(c,12,338,"TAP TO REPLACE A STEM / TAP AGAIN TO RELEASE",1,100,dim);snprintf(buf,sizeof(buf),"%s    A DRUMS    B HARMONICS    C VOCALS    D BYPASS",stem_pages[m->stem_page>=0&&m->stem_page<4?m->stem_page:0]);text(c,12,428,buf,1,115,dim);}
+  if(u->page==XZ_UI_STEMS){text(c,12,317,"GROOVE CIRCUIT",2,28,p->ink);text(c,190,322,"BANK A-H",1,20,dim);text(c,12,338,"TAP TO REPLACE A STEM / TAP AGAIN TO RELEASE",1,100,dim);snprintf(buf,sizeof(buf),"%s%s    A DRUMS    B HARMONICS    C VOCALS    D BYPASS",m->stem_page>0?"HOT CUE + ":"",stem_pages[m->stem_page>=0&&m->stem_page<4?m->stem_page:0]);text(c,12,428,buf,1,115,dim);}
   else{snprintf(buf,sizeof(buf),"%s BEATS / %+.1f KEY",lengths[d->loop_index>=0&&d->loop_index<6?d->loop_index:0],(double)d->pitch);text(c,600,279,buf,1,31,p->alarm);text(c,600,357,"VOL / HOLD LATCHES",1,30,dim);text(c,12,372,"SAMPLE BANK A-H / CLOSING X-PAD STOPS SOUND",1,90,dim);}
  }else if(u->page==XZ_UI_SETTINGS){text(c,398,258,"KEY CONTROL",1,62,dim);text(c,398,348,"STEM AND CUE SETTINGS APPLY TO BOTH DECKS",1,62,p->ink);text(c,398,369,"UNAVAILABLE CONTROLS ARE MARKED NOT READY",1,62,dim);}
  else if(u->page==XZ_UI_CONTROLS){
-  text(c,12,149,"STEMS PAD PAGE",2,40,p->ink);
+  text(c,12,149,"ADDITIONAL STEMS PAD PAGE",2,40,p->ink);
   text(c,12,228,"PADS A-D: DRUMS / HARMONICS / VOCALS / BYPASS",1,115,dim);
   text(c,406,258,"HOLD SHIFT + HOT CUE / BEAT LOOP / SLIP LOOP / BEAT JUMP",1,63,p->ink);
   text(c,406,279,"TO CONTROL DRUMS / HARMONICS / VOCALS / BYPASS",1,63,dim);
@@ -306,7 +315,7 @@ static struct xz_ui_action action(enum xz_ui_action_kind kind,enum xz_ui_phase p
 }
 size_t xz_ui_cancel(struct xz_ui *u,struct xz_ui_action out[XZ_UI_ACTIONS]){
  size_t n=0;if(u->held_kind!=XZ_UI_NONE)out[n++]=action(u->held_kind,XZ_UI_RELEASE,u->held_deck,u->held_index,0,0);
- u->held_kind=XZ_UI_NONE;u->capture=-1;u->down=0;return n;
+ u->held_kind=XZ_UI_NONE;u->capture=-1;u->down=0;u->dragged=0;return n;
 }
 static size_t touch_widgets(struct xz_ui *u,const struct xz_ui_model *m,int x,int y,int down,struct xz_ui_action out[XZ_UI_ACTIONS],const struct xz_ui_widget *w,size_t count){
  struct xz_ui_widget a;size_t n,i;const struct xz_ui_deck *d;int press;
@@ -356,9 +365,9 @@ static size_t inline_layout(const struct xz_ui *u,int width,int height,struct xz
  add(w,&n,0,2,40,height-4,XZ_UI_DECK,1-u->deck,0,u->deck?"D2":"D1");
  add(w,&n,42,2,56,height-4,XZ_UI_BYPASS,0,XZ_UI_STEM,"BYPASS");
  for(int i=0;i<3;i++){
+  const int order[3]={2,0,1};int stem=order[i];
   int x=100+(width-100)*i/3,end=100+(width-100)*(i+1)/3;
-  add(w,&n,x,2,end-x-2,22,XZ_UI_MUTE,i,XZ_UI_STEM,stems[i]);
-  add(w,&n,x,26,end-x-2,height-28,XZ_UI_LEVEL,i,XZ_UI_STEM,"");
+  add(w,&n,x,2,end-x-2,height-4,XZ_UI_MUTE,stem,XZ_UI_STEM,stems[stem]);
  }
  return n;
 }
@@ -366,6 +375,23 @@ size_t xz_ui_inline_touch(struct xz_ui *u,const struct xz_ui_model *m,int width,
  struct xz_ui_widget w[XZ_UI_WIDGETS];
  if(!u||!m)return 0;
  size_t count=inline_layout(u,width,height,w);
+ if(down&&!u->down)for(size_t i=0;i<count;i++){
+  struct xz_ui_widget a=w[i];
+  if(a.kind==XZ_UI_MUTE&&x>=a.x&&x<a.x+a.w&&y>=a.y&&y<a.y+a.h&&ready(m,u->deck,&a)){
+   u->down=1;u->capture=(int)i;u->held_kind=XZ_UI_MUTE;u->held_deck=u->deck;u->held_index=a.index;
+   u->touch_start_x=x;u->touch_start_level=m->deck[u->deck].levels[a.index];u->dragged=0;return 0;
+  }
+ }
+ if(u->held_kind==XZ_UI_MUTE&&u->capture>=0&&(size_t)u->capture<count){
+  struct xz_ui_widget a=w[u->capture];int dx=x-u->touch_start_x;
+  if(down){
+   if(dx>8||dx< -8)u->dragged=1;
+   if(!u->dragged)return 0;
+   out[0]=action(XZ_UI_LEVEL,XZ_UI_MOVE,u->held_deck,u->held_index,clampf(u->touch_start_level+(float)dx/(a.w-12),0,1),0);return 1;
+  }
+  size_t n=0;if(!u->dragged)out[n++]=action(XZ_UI_MUTE,XZ_UI_PRESS,u->held_deck,u->held_index,1,0);
+  struct xz_ui_action ignored[XZ_UI_ACTIONS];xz_ui_cancel(u,ignored);return n;
+ }
  return touch_widgets(u,m,x,y,down,out,w,count);
 }
 int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pixels,size_t count,size_t stride,int width,int height){
@@ -382,6 +408,17 @@ int xz_ui_inline_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16
   uint32_t color=available?p->ink:blend(p->bg,p->ink,100);
   rect(c,a.x,a.y,a.w,a.h,blend(p->bg,p->ink,22));
   border(c,a.x,a.y,a.w,a.h,blend(p->bg,p->ink,100));
+  if(a.kind==XZ_UI_MUTE){
+   int on=available&&!muted&&d->levels[a.index]>0;
+   rect(c,a.x+1,a.y+1,a.w-2,a.h-2,blend(p->bg,p->stem[a.index],on?150:32));
+   border(c,a.x,a.y,a.w,a.h,available?p->stem[a.index]:color);
+   text(c,a.x+8,a.y+7,a.label,2,(a.w-16)/12,color);
+   int bar=(int)((a.w-12)*clampf(muted?0:d->levels[a.index],0,1));
+   rect(c,a.x+6,a.y+a.h-8,a.w-12,4,blend(p->bg,p->ink,60));
+   if(bar)rect(c,a.x+6,a.y+a.h-8,bar,4,on?p->stem[a.index]:color);
+   if(d->stem_loading)text(c,a.x+8,a.y+30,"LOADING",1,(a.w-16)/6,p->alarm);
+   continue;
+  }
   if(a.kind==XZ_UI_LEVEL){
    int y=a.y+a.h/2;
    rect(c,a.x+8,y-1,a.w-16,2,color);

@@ -6,6 +6,8 @@
 #include "ui/native_touch.h"
 #include "ui/stem_pads.h"
 #include "ui/native_led.h"
+#include "ui/native_wave_runtime.h"
+#include "ui/wave_viewport.h"
 #include "settings.h"
 #include "../vendor/tools/xz_runtime/mods_bridge.h"
 #include <dlfcn.h>
@@ -17,6 +19,7 @@
 
 static pthread_mutex_t ui_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct xz_ui ui;
+static struct xz_ui inline_ui;
 static struct xz_ui_model model;
 static struct xz_native_touch touch;
 static struct xz_audio_status audio_status[2];
@@ -26,13 +29,20 @@ static int started, visible, audio_available, key_available, forwarded_down;
 static int fb_takeover_active = 1;
 static char device_ip[16];
 static struct xz_stem_pads pads;
-static unsigned touch_muted[2];
 static int deck_page[2] = {-1,-1};
 static unsigned sync_down, sync_owned;
 static pthread_cond_t settings_changed = PTHREAD_COND_INITIALIZER;
 static pthread_t settings_thread;
 static int settings_running, settings_pending;
 static int requested_stems;
+static int native_focus=-1;
+static uint32_t followed_generation;
+static int inline_requested, inline_contact, inline_wave_contact, inline_cancelled;
+static uint32_t displayed_generation[2], reported_generation[2];
+static unsigned char overview[2][192];
+struct prepared_proof_deck { uint32_t state,rate,frames,mixed,missed; int32_t lag; float correlation; };
+struct prepared_proof { uint32_t version,sequence; struct prepared_proof_deck deck[2]; };
+__attribute__((visibility("default"))) struct prepared_proof xz_prepared_proof_v1={1,0,{{0}}};
 static char settings_usb[1024];
 static struct stat settings_volume;
 
@@ -95,9 +105,16 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
     for (size_t i = 0; i < count; i++) {
         const struct xz_ui_action *a = &actions[i];
         switch (a->kind) {
+        case XZ_UI_STEMS_OVERLAY:
+            model.stems_overlay=!model.stems_overlay;
+            __atomic_store_n(&inline_requested,requested_stems && model.stems_overlay && !touch.visible,__ATOMIC_RELEASE);
+            break;
         case XZ_UI_CLOSE:
             xz_native_touch_visible(&touch, 0);
             __atomic_store_n(&visible, 0, __ATOMIC_RELEASE);
+            break;
+        case XZ_UI_DECK:
+            if (a->index >= 0 && a->index < 2) { ui.deck = a->index; inline_ui.deck = a->index; }
             break;
         case XZ_UI_ENABLE:
             if (a->index == XZ_UI_GATE || a->index == XZ_UI_SMART ||
@@ -118,9 +135,9 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
             break;
         case XZ_UI_MUTE:
             if (a->deck >= 0 && a->deck < 2 && a->index >= 0 && a->index < 3) {
-                if (a->phase == XZ_UI_RELEASE) touch_muted[a->deck] &= ~(1u << a->index);
-                else touch_muted[a->deck] |= 1u << a->index;
-                model.deck[a->deck].muted = touch_muted[a->deck] | pads.muted[a->deck];
+                if (a->phase != XZ_UI_PRESS) break;
+                pads.muted[a->deck] ^= 1u << a->index;
+                model.deck[a->deck].muted = pads.muted[a->deck];
                 levels(a->deck);
             }
             break;
@@ -169,6 +186,8 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
 }
 
 static void refresh(void) {
+    __atomic_store_n(&inline_requested, requested_stems && model.stems_overlay && !touch.visible, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&xz_prepared_proof_v1.sequence,1,__ATOMIC_SEQ_CST);
     for (int deck = 0; deck < 2; deck++) {
         model.deck[deck].ready = XZ_UI_GATE | XZ_UI_SMART | XZ_UI_THEME;
         if (key_available) {
@@ -178,13 +197,87 @@ static void refresh(void) {
         if (audio_available) {
             model.deck[deck].ready |= XZ_UI_STEM;
             if (xz_audio_get_status(deck, &audio_status[deck]) == 0) {
+                struct xz_audio_status *s = &audio_status[deck];
+                if (displayed_generation[deck] != s->generation) {
+                    displayed_generation[deck] = s->generation;
+                    struct xz_ui_action cancelled[XZ_UI_ACTIONS];
+                    if (inline_ui.deck == deck) { xz_ui_cancel(&inline_ui,cancelled); inline_cancelled = inline_contact; }
+                    if (ui.deck == deck) { xz_ui_cancel(&ui,cancelled); if (touch.capture) touch.opening_contact = 1; }
+                    pads.muted[deck] = model.deck[deck].muted = 0;
+                    model.deck[deck].levels[0] = model.deck[deck].levels[1] = model.deck[deck].levels[2] = 1;
+                    model.deck[deck].bypass = 0;
+                }
+                xz_prepared_proof_v1.deck[deck] = (struct prepared_proof_deck){s->state,s->reader_rate,s->reader_frames,s->mixed_blocks,s->skipped_blocks,s->alignment_frames,s->alignment_correlation};
+                if (s->prepared && s->state == XZ_AUDIO_EXPERIMENTAL_READY && reported_generation[deck] != s->generation) {
+                    char line[160];snprintf(line,sizeof(line),"PREPARED_STEMS_READY: deck=%d rate=%u frames=%u lag=%d correlation=%.6f",deck+1,s->reader_rate,s->reader_frames,s->alignment_frames,s->alignment_correlation);
+                    xz_log(line);reported_generation[deck] = s->generation;
+                }
                 const char *path = audio_status[deck].path;
                 const char *name = strrchr(path, '/');
                 model.deck[deck].track = path[0] ? (name ? name + 1 : path) : "NO TRACK CAPTURED";
                 model.deck[deck].status = xz_audio_state_name(audio_status[deck].state);
+                model.deck[deck].stem_loading = s->state==XZ_AUDIO_PREPARED_ALIGNING || s->state==XZ_AUDIO_PREPARED_BUFFERING;
+                model.deck[deck].wave_peaks = NULL; model.deck[deck].wave_count = 0;
+                if (xz_audio_waveform(deck, 2, overview[deck], sizeof(overview[deck]), NULL)) {
+                    for (unsigned i=0;i<sizeof(overview[deck]);i++) overview[deck][i]=(unsigned char)(overview[deck][i]*255/31);
+                    model.deck[deck].wave_peaks=overview[deck];model.deck[deck].wave_count=sizeof(overview[deck]);
+                }
             }
         }
     }
+    int focus=xz_native_focus_deck();
+    if(focus!=native_focus){native_focus=focus;followed_generation=0;}
+    if(focus>=0&&focus<2&&audio_status[focus].prepared&&
+       audio_status[focus].generation!=followed_generation){
+        followed_generation=audio_status[focus].generation;
+        if(inline_ui.deck!=focus){
+            struct xz_ui_action cancelled[XZ_UI_ACTIONS];xz_ui_cancel(&inline_ui,cancelled);
+            inline_cancelled=inline_contact;inline_ui.deck=focus;
+            if(!touch.visible)ui.deck=focus;
+        }
+    }
+    __atomic_add_fetch(&xz_prepared_proof_v1.sequence,1,__ATOMIC_SEQ_CST);
+}
+
+static int inline_enabled(void) { return __atomic_load_n(&started,__ATOMIC_ACQUIRE) && __atomic_load_n(&inline_requested,__ATOMIC_ACQUIRE); }
+static int render_inline(void *context,uint16_t *pixels,size_t count,size_t stride,int width,int height) {
+    (void)context;
+    static _Thread_local uint16_t cached[536*64];
+    static _Thread_local int cached_valid;
+    if (!pixels || width!=536 || height!=64 || stride<536 || stride>count/64) return 0;
+    if (pthread_mutex_trylock(&ui_mutex) != 0) {
+        if (!cached_valid || !inline_enabled()) return 0;
+        for (int y=0;y<64;y++) memcpy(pixels+y*stride,cached+y*536,536*sizeof(*pixels));
+        return 1;
+    }
+    refresh();
+    if (touch.visible || !requested_stems || !model.stems_overlay) { pthread_mutex_unlock(&ui_mutex); return 0; }
+    int result=xz_ui_inline_render(&inline_ui,&model,pixels,count,stride,width,height);
+    if(result&&!model.deck[inline_ui.deck].stem_loading)for(unsigned column=0;column<3;column++){
+        const unsigned order[3]={2,0,1};unsigned role=order[column];
+        int left=100+(width-100)*(int)column/3+4,right=100+(width-100)*(int)(column+1)/3-6;
+        unsigned char peaks[256];float progress=0;
+        size_t n=(size_t)(right-left);if(n>sizeof(peaks))n=sizeof(peaks);
+        if(!xz_audio_waveform(inline_ui.deck,role,peaks,n,&progress))continue;
+        uint32_t rgb=xz_ui_stem_color(model.theme,(int)role);
+        uint16_t color=(uint16_t)(((rgb>>19)&31)<<11|((rgb>>10)&63)<<5|((rgb>>3)&31));
+        float gain=model.deck[inline_ui.deck].muted&(1u<<role)?0:model.deck[inline_ui.deck].levels[role];
+        for(size_t x=0;x<n;x++){
+            int amplitude=(int)(peaks[x]*gain*6/31);if(amplitude>6)amplitude=6;
+            for(int y=28;y<41;y++)pixels[(size_t)y*stride+(size_t)left+x]=0;
+            for(int y=34-amplitude;y<=34+amplitude;y++)pixels[(size_t)y*stride+(size_t)left+x]=gain?color:0x3186;
+        }
+        int needle=left+(int)(progress*(float)(n-1));for(int y=28;y<41;y++)pixels[(size_t)y*stride+(size_t)needle]=0xffff;
+    }
+    if (result) {
+        for (int y=0;y<64;y++) memcpy(cached+y*536,pixels+y*stride,536*sizeof(*pixels));
+        cached_valid=1;
+    } else cached_valid=0;
+    pthread_mutex_unlock(&ui_mutex);return result;
+}
+
+static int stem_controls_active(int deck) {
+    return deck>=0 && deck<2 && audio_available && (model.enabled & XZ_UI_STEM);
 }
 
 int xz_ui_runtime_pad(const struct xz_cue_event *event,unsigned *trace_flags) {
@@ -210,14 +303,14 @@ int xz_ui_runtime_pad(const struct xz_cue_event *event,unsigned *trace_flags) {
         (ui.deck == event->deck ? 8u : 0) | (model.enabled & XZ_UI_STEM ? 16u : 0) |
         (audio_available ? 32u : 0) | (event->hotcue_mode ? 64u : 0);
     int toggle;
-    int active = touch.visible && ui.page == XZ_UI_STEMS && ui.deck == event->deck &&
-        audio_available && (model.enabled & XZ_UI_STEM);
-    int consumed = xz_stem_control_event(&pads, event, active, model.stem_page, model.shift_pages, &toggle);
+    int active = stem_controls_active(event->deck);
+    int page=event->pad_page==0?0:model.stem_page;
+    int consumed = xz_stem_control_event(&pads, event, active, page, model.shift_pages, &toggle);
     if (consumed) *trace_flags |= 128u;
     if (toggle >= 0) *trace_flags |= 256u;
     if (toggle >= 0) {
         int deck = event->deck;
-        model.deck[deck].muted = touch_muted[deck] | pads.muted[deck];
+        model.deck[deck].muted = pads.muted[deck];
         if (toggle == 3) model.deck[deck].bypass = !model.deck[deck].bypass;
         levels(deck);
     }
@@ -233,8 +326,7 @@ int xz_ui_runtime_pad(const struct xz_cue_event *event,unsigned *trace_flags) {
 int xz_ui_runtime_pad_color(int deck,int pad,unsigned *rgb,int *lit) {
     if (!__atomic_load_n(&started,__ATOMIC_ACQUIRE) || deck < 0 || deck > 1 || pad < 0 || pad > 3) return 0;
     if (pthread_mutex_trylock(&ui_mutex)) return 0;
-    int active = touch.visible && ui.page == XZ_UI_STEMS && ui.deck == deck &&
-        audio_available && (model.enabled & XZ_UI_STEM) && model.pad_feedback && deck_page[deck] == model.stem_page;
+    int active = stem_controls_active(deck) && model.pad_feedback && (deck_page[deck] == 0 || deck_page[deck] == model.stem_page);
     if (active) {
         *rgb = pad < 3 ? xz_ui_stem_color(model.theme,pad) : 0xffffffu;
         *lit = pad < 3 ? !(model.deck[deck].muted & (1u << pad)) && !model.deck[deck].bypass : model.deck[deck].bypass;
@@ -250,7 +342,30 @@ static void touch_hook(void *self, const struct xz_touch_status *status, const v
     if (!__atomic_load_n(&started, __ATOMIC_ACQUIRE)) { stock_touch(self, status, mode); return; }
     pthread_mutex_lock(&ui_mutex);
     refresh();
-    int owned = xz_native_touch_dispatch(&touch, self, status, mode, stock_touch);
+    int previous_down=((const unsigned char *)self)[4]!=0;
+    if(!touch.visible&&!previous_down&&status->down&&status->x<115){
+        if(status->y>=18&&status->y<159)ui.deck=inline_ui.deck=0;
+        else if(status->y>=161&&status->y<302)ui.deck=inline_ui.deck=1;
+    }
+    int active=!touch.visible&&xz_native_inline_active();
+    if(active&&!inline_contact&&!previous_down&&status->down&&status->x>=131&&status->x<667&&status->y>=222&&status->y<286){inline_contact=1;inline_cancelled=0;}
+    int owned;
+    if(inline_contact){
+        struct xz_ui_action actions[XZ_UI_ACTIONS];
+        size_t n=inline_cancelled?0:xz_ui_inline_touch(&inline_ui,&model,536,64,(int)status->x-131,(int)status->y-222,!!status->down,actions);
+        if(n)apply(NULL,actions,n);
+        if(!status->down){inline_contact=0;inline_cancelled=0;}
+        owned=1;
+    }else{
+        if(!previous_down&&status->down)inline_wave_contact=active&&status->x>=131&&status->x<667&&status->y>=18&&status->y<222;
+        struct xz_touch_status mapped=*status;
+        if(inline_wave_contact&&mapped.y>=18){
+            if(mapped.y<222)mapped.y=18+xz_wave_source_row(mapped.y-18,100);
+            else mapped.y=mapped.y>=416?479:mapped.y+64;
+        }
+        owned=xz_native_touch_dispatch(&touch,self,&mapped,mode,stock_touch);
+        if(!status->down)inline_wave_contact=0;
+    }
     __atomic_store_n(&visible, touch.visible, __ATOMIC_RELEASE);
     if (owned && forwarded_down && forward_touch) {
         forward_touch(0, (int)status->x, (int)status->y); forwarded_down = 0;
@@ -275,6 +390,7 @@ __attribute__((visibility("default"))) int xz_mods_takeover_v1(void) {
 
 static void badge(uint16_t *pixels, uint32_t stride) {
     xz_ui_render_badge(pixels,stride);
+    xz_ui_render_stems_button(pixels,stride,model.stems_overlay);
     if (model.takeover_assign == XZ_TAKEOVER_ONSCREEN) {
         xz_ui_render_vj_button(pixels, stride, model.fb_takeover);
     }
@@ -328,6 +444,7 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     key_available = key_ready;
     memset(&model, 0, sizeof(model));
     model.pad_feedback = 1;
+    model.stems_overlay = 1;
     model.fb_takeover = 1;
     model.takeover_assign = XZ_TAKEOVER_LINK;
     __atomic_store_n(&fb_takeover_active, 1, __ATOMIC_RELEASE);
@@ -354,6 +471,10 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
         }
         model.settings_status = rc < 0 ? "INVALID USB SETTINGS: USING DEFAULTS" : rc ? "USB SETTINGS READY" : "SETTINGS RESTORED FROM USB";
     }
+    const char *force_stems = getenv("XZ_MODS_STEMS_FORCE");
+    if (audio_ready && force_stems && !strcmp(force_stems,"1")) {
+        requested_stems=1;model.enabled|=XZ_UI_STEM;xz_audio_set_enabled(1);
+    }
     for (int i = 0; i < 4; i++) {
         model.deck[i].groove_active = model.deck[i].sample_active = -1;
         model.deck[i].levels[0] = model.deck[i].levels[1] = model.deck[i].levels[2] = 1;
@@ -362,6 +483,7 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
         model.deck[i].status = i < 2 ? "NATIVE ADAPTER EXPERIMENTAL" : "CONTROL IN REKORDBOX OR SERATO";
     }
     xz_ui_init(&ui);
+    xz_ui_init(&inline_ui);
     xz_native_touch_init(&touch, &ui, &model, apply, NULL);
     refresh();
     if (xz_hook_arm(0x2628b4, guard, (void *)touch_hook, (void **)&stock_touch) != 0) return -1;
@@ -376,6 +498,7 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
         }
     }
     __atomic_store_n(&started, 1, __ATOMIC_RELEASE);
+    if (xz_native_inline_start(inline_enabled,render_inline,NULL)) xz_log("Native inline stems unavailable: window ABI guard failed");
     if (xz_native_led_start()) xz_log("Native pad LED feedback unavailable");
     xz_log("UI touch adapter installed; MODS badge opens the panel");
     return 0;

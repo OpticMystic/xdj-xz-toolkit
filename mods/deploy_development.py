@@ -23,8 +23,11 @@ def main():
     parser.add_argument("--host", default="169.254.168.59")
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--previous-evidence", type=Path, help="Verified live receipt when replacing an earlier development pair")
+    parser.add_argument("--previous-bundle", type=Path, help="Verified bundle used by the normal combined USB loader")
     parser.add_argument("--fast-transfer", action="store_true", help="Use the already installed private RAM transfer helper")
     parser.add_argument("--pad-trace", action="store_true", help="Enable bounded in-memory physical-key diagnostics")
+    parser.add_argument("--stems", action="store_true", help="Enable prepared-stem discovery with native-audio alignment")
+    parser.add_argument("--inline-observe", action="store_true", help="Observe the exact native wave lock without drawing")
     parser.add_argument("--settings-usb", help="Existing mounted XZ USB volume for persistent preferences")
     args = parser.parse_args()
     if args.settings_usb:
@@ -78,6 +81,18 @@ def main():
         old_enabled = 1
         old_observer = int(previous["mode"] == "observer")
         old_ui = int(previous["mode"] == "experimental")
+    elif "/dev/shm/libxz-mods.so" in tokens:
+        if not args.previous_bundle:
+            raise ValueError("Supply --previous-bundle before replacing a combined USB runtime")
+        previous = json.loads((args.previous_bundle / "manifest.json").read_text())
+        old_mod = "/dev/shm/libxz-mods.so"
+        if old_receiver not in tokens:
+            raise ValueError("Combined USB runtime has no matching receiver")
+        for remote_file, name in ((old_mod, "libxz-mods.so"), (old_receiver, "libxz-receiver.so")):
+            data = base64.b64decode("".join(command(args.host, "base64 " + shlex.quote(remote_file)).splitlines()), validate=True)
+            if hashlib.sha256(data).hexdigest() != previous["files"][name]:
+                raise ValueError("Running USB library differs from the previous bundle")
+        old_enabled = old_ui = 1
     elif old_receiver not in tokens:
         raise ValueError("Expected the existing receiver; refusing an unknown preload composition")
     remote = "/dev/shm/xz-dev-" + manifest["runtime_sha256"][:12] + "-" + pid
@@ -104,7 +119,11 @@ def main():
         raise ValueError("This test restarter expects the verified USB link-local connection")
     restore_network = f"ifconfig eth0 {ip} netmask 255.255.0.0 up; route add -net 169.254.0.0 netmask 255.255.0.0 dev eth0 2>/dev/null || true"
     old_env = "LD_PRELOAD=" + shlex.quote(old_preload) + f" XZ_MODS_ENABLE={old_enabled} XZ_MODS_OBSERVER={old_observer} XZ_MODS_UI={old_ui} XZ_MODS_STEMS=0 XZ_MODS_KEYSHIFT=0"
-    new_env = "LD_PRELOAD=" + shlex.quote(new_preload) + f" XZ_MODS_ENABLE=1 XZ_MODS_OBSERVER={int(mode == 'observer')} XZ_MODS_UI={int(mode == 'experimental')} XZ_MODS_STEMS=0 XZ_MODS_GATE_CUE=0 XZ_MODS_SMART_CUE=0 XZ_MODS_KEYSHIFT=0"
+    new_env = "LD_PRELOAD=" + shlex.quote(new_preload) + f" XZ_MODS_ENABLE=1 XZ_MODS_OBSERVER={int(mode == 'observer')} XZ_MODS_UI={int(mode == 'experimental')} XZ_MODS_STEMS={int(args.stems)} XZ_MODS_GATE_CUE=0 XZ_MODS_SMART_CUE=0 XZ_MODS_KEYSHIFT=0"
+    if args.inline_observe:
+        new_env += " XZ_MODS_INLINE=observe"
+    if args.stems:
+        new_env += " XZ_MODS_STEMS_FORCE=1"
     if args.settings_usb:
         new_env += " XZ_MODS_USB=" + shlex.quote(args.settings_usb)
     new_env += f" XZ_MODS_PAD_TRACE={int(args.pad_trace)}"

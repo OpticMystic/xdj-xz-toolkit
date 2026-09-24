@@ -128,13 +128,17 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
     static const unsigned char output_guard[8] = {0xf0,0x41,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
     static const unsigned char link_guard[8] = {0x70,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
     static const unsigned char rekordbox_guard[8] = {0x38,0x40,0x2d,0xe9,0x00,0x50,0xa0,0xe1};
+    static const unsigned char wave_lock_guard[8] = {0x38,0x40,0x2d,0xe9,0x00,0x40,0xa0,0xe1};
+    static const unsigned char wave_unlock_guard[8] = {0x10,0x40,0x2d,0xe9,0x58,0xd0,0x4d,0xe2};
     const unsigned char *guard = address == 0x8fd5c ? source_guard :
                                  address == 0x34ba0 ? load_guard :
                                  address == 0x348dc ? unload_guard :
                                  address == 0x2628b4 ? touch_guard :
                                  address == 0x76284 ? output_guard :
                                  address == 0xdf994 ? link_guard :
-                                 address == 0xe0a50 ? rekordbox_guard : NULL;
+                                 address == 0xe0a50 ? rekordbox_guard :
+                                 address == 0x156958 ? wave_lock_guard :
+                                 address == 0x1656c4 ? wave_unlock_guard : NULL;
     if (!application_verified || !guard || !expected || !replacement || !original ||
         code_hook_count >= sizeof(code_hooks)/sizeof(code_hooks[0]) || memcmp(expected, guard, 8) != 0) return -1;
     int protection = range_protection(address, 8);

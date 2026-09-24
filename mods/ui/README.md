@@ -1,8 +1,8 @@
 # Native 800x480 mod controls
 
 See [NATIVE_STYLE.md](NATIVE_STYLE.md) for the native-style typography, colours,
-font provenance and local preview workflow. This visual revision is not loaded
-on the XZ; physical validation remains deferred at the user's request.
+font provenance and local preview workflow. Track each deployed runtime and
+physical acceptance separately from portable UI tests.
 
 `ui.c` renders RGB565 into a caller-owned framebuffer. It has no DirectFB,
 device, audio, network or allocation dependency. The runtime supplies a snapshot
@@ -30,8 +30,8 @@ and receives typed actions; the renderer never assumes a feature is implemented.
 
 `XZ_UI_PANEL` carries the old page in `index` and new page in `value`. Closing
 X-PAD must stop its sound and restore the physical pad/memory/delete/volume
-roles. Closing STEMS must restore hot cue pad ownership **without stopping an
-active Groove replacement**. `XZ_UI_DECK` carries old deck in `deck` and new
+roles. Closing MODS or hiding the STEMS strip preserves independent stem pad control
+on both decks while stems are enabled. Disabling stems restores normal hot cues. `XZ_UI_DECK` carries old deck in `deck` and new
 deck in `index`; runtime must release old deck panel ownership and establish
 the new one. `XZ_UI_CLOSE` returns the screen to the host's stock interface.
 The pure UI cannot execute any of these engine transitions itself.
@@ -40,7 +40,7 @@ The pure UI cannot execute any of these engine transitions itself.
 |---|---|
 | ENABLE | `index` is capability bit, `value` is requested 0/1 |
 | LEVEL / VOLUME | normalized 0..1 `value`, PRESS/MOVE |
-| MUTE | stem index 0..2, PRESS=held, RELEASE=restore |
+| MUTE | stem index 0..2, PRESS toggles the shared touch/pad mute latch |
 | BYPASS | requested 0/1; runtime chooses original audio |
 | GROOVE_PAD | slot 0..7; runtime toggles it and releases any previous slot |
 | SAMPLE_PAD / HOTCUE_PAD | slot 0..7 and PRESS/RELEASE |

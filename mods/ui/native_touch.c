@@ -40,6 +40,11 @@ static int region(const struct xz_native_touch*t,const struct xz_touch_status*s)
 int xz_native_touch_dispatch(struct xz_native_touch*t,void*self,const struct xz_touch_status*s,const void*mode,xz_stock_touch stock) {
  struct xz_touch_status previous;struct xz_ui_action out[XZ_UI_ACTIONS];size_t n;
  memcpy(&previous,(const char*)self+4,sizeof(previous));
+ if(!t->visible&&!t->capture&&s->down&&!previous.down&&s->x>=674&&s->x<742&&s->y<24) {
+  t->capture=1;t->opening_contact=1;
+  struct xz_ui_action act={.kind=XZ_UI_STEMS_OVERLAY};
+  if(t->apply)t->apply(t->context,&act,1);
+ }
  if(!t->visible&&!t->capture&&s->down&&!previous.down&&badge(t,s)) {
   t->visible=1;t->capture=1;t->opening_contact=1;
  }

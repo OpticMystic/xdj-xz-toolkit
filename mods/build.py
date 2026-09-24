@@ -60,6 +60,14 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
     destination = args.output.resolve() / "libxz-mods-development.so"
     compiler = shutil.which(args.zig) or str(pathlib.Path(args.zig).resolve())
+    # Keep the qualified legacy decoder compilation unchanged. LLVM 21 crashes
+    # when compiling its dr_libs paths with softfp. Only the new streaming math
+    # needs VFP; softfp retains the same function-call ABI as the legacy objects.
+    stream_object = args.output.resolve() / "overcue-stream.o"
+    subprocess.run([compiler, "cc", "-target", "arm-linux-gnueabi.2.13", "-mcpu=cortex_a9",
+                    "-mfloat-abi=softfp", "-mfpu=neon", "-O2", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                    "-fPIC", "-fvisibility=hidden", "-c", str(ROOT / "audio/overcue_stream.c"),
+                    "-o", str(stream_object)], check=True)
     command = [compiler, "cc", "-target", "arm-linux-gnueabi.2.13", "-mcpu=cortex_a9",
                "-O2", "-s", "-std=c11", "-Wall", "-Wextra", "-Werror", "-fPIC", "-shared",
                "-fvisibility=hidden", "-Wl,--no-undefined", "-Wl,-z,nodelete",
@@ -69,11 +77,15 @@ def main() -> None:
                str(ROOT / "ui/stem_pads.c"),
                str(ROOT / "ui/native_led.c"),
                str(ROOT / "ui/native_wave.c"),
+               str(ROOT / "ui/native_wave_runtime.c"),
                str(ROOT / "settings.c"),
                str(ROOT / "ui/wave_viewport.c"),
                str(ROOT / "key/keyshift.c"), str(ROOT / "key/runtime.c"),
                str(ROOT / "audio/runtime.c"), str(ROOT / "audio/native_reader.c"),
                str(ROOT / "audio/stem_cache.c"), str(ROOT / "audio/stem_mix.c"), str(ROOT / "audio/stem_decode.c"),
+               str(ROOT / "audio/overcue_file.c"), str(stream_object),
+               str(ROOT / "audio/vendor/miniz/miniz_tinfl.c"), str(ROOT / "audio/vendor/sha256/sha256.c"),
+               "-DMINIZ_NO_ARCHIVE_APIS", "-DMINIZ_NO_DEFLATE_APIS",
                "-pthread", "-lm", "-ldl",
                "-o", str(destination)]
     subprocess.run(command, check=True)
@@ -110,7 +122,7 @@ def main() -> None:
                    "default_enabled": False, "hardware_verified": False,
                    "features": {"gate_cue": "native adapter, unverified",
                                 "smart_cue": "native adapter, unverified",
-                                "stems": "native adapter, 44100 Hz WAV/FLAC only, alignment unverified",
+                                "stems": "OverCue v4 96000 Hz paged PCM and legacy 44100 Hz WAV/FLAC; physical acceptance pending",
                                 "ui": "render and touch adapters, physical acceptance pending",
                                 "vj_tools": "optional display bridge; original receiver separately packaged"}})
     destination.with_suffix(".json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf8")

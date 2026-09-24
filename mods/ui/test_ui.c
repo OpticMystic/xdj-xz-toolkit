@@ -35,6 +35,9 @@ int main(int argc,char **argv){
  for(i=0;i<4;i++){m.deck[i].groove_active=-1;m.deck[i].sample_active=-1;m.deck[i].sample_volume=1;for(j=0;j<3;j++)m.deck[i].levels[j]=1;}
  assert(tap(&u,&m,XZ_UI_BYPASS,0).kind==XZ_UI_UNAVAILABLE);assert(strstr(u.notice,"NOT READY"));
  m.enabled=XZ_UI_STEM|XZ_UI_SAMPLE; m.deck[0].ready=0x7ff;
+ {struct xz_ui saved=u;u.deck=3;u.page=XZ_UI_SETTINGS;
+  assert(tap(&u,&m,XZ_UI_ENABLE,XZ_UI_STEM).kind==XZ_UI_ENABLE);
+  u.page=XZ_UI_STEMS;assert(tap(&u,&m,XZ_UI_MUTE,0).kind==XZ_UI_UNAVAILABLE);u=saved;}
  m.deck[0].groove_assigned=255;m.deck[0].groove_loaded=255;m.deck[0].sample_loaded=255;m.deck[0].loop_index=3;
  assert(tap(&u,&m,XZ_UI_BYPASS,0).kind==XZ_UI_BYPASS);
  assert(m.deck[0].bypass==0);

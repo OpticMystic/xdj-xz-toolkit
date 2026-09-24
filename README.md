@@ -1,7 +1,7 @@
 # xdj-xz-toolkit
 
 Public XDJ-XZ USB builder inputs and ARM display-hook sources for firmware
-1.26. Developer preview — no live-hardware validation is claimed.
+1.26. Version 0.1.1 is a developer preview; final native-player and cold-boot qualification remains pending.
 
 ## What this is not
 
@@ -60,3 +60,18 @@ checkout with `--toolkit <path>` / `$XZ_TOOLKIT_DIR`.
 
 MIT (`LICENSE`). Mixed third-party notices in `THIRD-PARTY-NOTICES.md` —
 retain MPL-2.0/OFL/LGPL texts with the covered files.
+
+## OverCue v4 and the current fixes
+
+The runtime reads existing `CDJMODS/index.json` and `overcue-stems/4` bundles.
+It verifies original track identity and every decoded page, then mixes prepared
+96 kHz stereo audio using bounded background windows. The native screen keeps
+both waveforms and adds stem controls. Each deck has independent pad state;
+the STEMS overlay toggle does not disable audio or pads. Loop-start caching
+retains current and pending selections without restoring muted stems.
+
+See [the format and runtime contract](mods/audio/OVERCUE.md) and
+[the companion changelog](https://github.com/OpticMystic/XZ-Mods/blob/main/CHANGELOG.md).
+`builder/build_overcue_check.py` builds the read-only desktop compatibility
+checker from the same decoder. The separation workflow still writes legacy
+stemd caches; it does not export OverCue bundles.

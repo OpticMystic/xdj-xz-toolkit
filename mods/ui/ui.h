@@ -22,7 +22,7 @@ enum xz_ui_action_kind {
     XZ_UI_SET_THEME, XZ_UI_SERVER_AUTO, XZ_UI_SERVER_ADDRESS, XZ_UI_KEY_SHIFT,
     XZ_UI_KEY_SYNC, XZ_UI_HOTCUE_PAD, XZ_UI_CONNECTION_ENABLE, XZ_UI_DISCOVERY,
     XZ_UI_STEM_PAGE, XZ_UI_SHIFT_PAGES, XZ_UI_PAD_FEEDBACK, XZ_UI_SHIFT_KEYSYNC,
-    XZ_UI_TAKEOVER_TOGGLE, XZ_UI_TAKEOVER_ASSIGN
+    XZ_UI_TAKEOVER_TOGGLE, XZ_UI_TAKEOVER_ASSIGN, XZ_UI_STEMS_OVERLAY
 };
 enum xz_ui_phase { XZ_UI_PRESS, XZ_UI_MOVE, XZ_UI_RELEASE };
 struct xz_ui_action {
@@ -39,6 +39,7 @@ struct xz_ui_deck {
     int bypass, groove_active, sample_active, hold, overdub, loop_index;
     float pitch;
     int key_semitones;
+    int stem_loading;
     unsigned char groove_stem[8];
     const unsigned char *wave_peaks;
     size_t wave_count;
@@ -58,7 +59,7 @@ struct xz_ui_model {
     unsigned blink;
     struct xz_ui_connection connection;
     int stem_page, shift_pages, pad_feedback, shift_keysync;
-    int fb_takeover, takeover_assign;
+    int fb_takeover, takeover_assign, stems_overlay;
     const char *settings_status;
 };
 struct xz_ui {
@@ -66,6 +67,8 @@ struct xz_ui {
     int deck, down, capture;
     enum xz_ui_action_kind held_kind;
     int held_index, held_deck;
+    int touch_start_x, dragged;
+    float touch_start_level;
     char notice[96];
 };
 struct xz_ui_widget {
@@ -88,5 +91,6 @@ uint32_t xz_ui_stem_color(int theme,int index);
 int xz_ui_inline_render(const struct xz_ui *,const struct xz_ui_model *,uint16_t *,size_t count,size_t stride,int width,int height);
 size_t xz_ui_inline_touch(struct xz_ui *,const struct xz_ui_model *,int width,int height,int x,int y,int down,struct xz_ui_action out[XZ_UI_ACTIONS]);
 void xz_ui_render_badge(uint16_t *pixels,size_t stride);
+void xz_ui_render_stems_button(uint16_t *pixels,size_t stride,int enabled);
 void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active);
 #endif

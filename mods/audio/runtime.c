@@ -2,6 +2,7 @@
 #define _FILE_OFFSET_BITS 64
 #define _POSIX_C_SOURCE 200809L
 #include "runtime.h"
+#include "overcue.h"
 #include "native_reader.h"
 #include "../runtime.h"
 #include <dirent.h>
@@ -20,6 +21,7 @@
 
 struct publication {
     struct xz_stem_decoded decoded;
+    struct xz_oc_stream *prepared;
     uint32_t generation, reader, reader_impl, reader_frames;
 };
 struct deck_state {
@@ -129,7 +131,7 @@ static struct publication *retire(struct deck_state *deck)
 
 static void free_publication(struct publication *p)
 {
-    if (p) { xz_stem_decoded_free(&p->decoded); free(p); }
+    if (p) { xz_oc_stream_close(p->prepared); xz_stem_decoded_free(&p->decoded); free(p); }
 }
 
 static uint32_t cancel_deck(int index, enum xz_audio_state state)
@@ -186,6 +188,7 @@ static int load_hook(void *reader, const void *track)
             output_epoch = __atomic_add_fetch(&decks[index].output_epoch, 1,
                                                __ATOMIC_ACQ_REL);
             generation = cancel_deck(index, XZ_AUDIO_LOADING_TRACK);
+            xz_audio_set_levels(index, (struct xz_stem_levels){1,1,1});
         }
     }
     result = original_load(reader, track);
@@ -294,8 +297,18 @@ static uint32_t stream_hook(void *self, int32_t position, void *buffer, uint32_t
             __atomic_load_n(&enabled, __ATOMIC_ACQUIRE) &&
             gen == __atomic_load_n(&deck->generation, __ATOMIC_SEQ_CST) &&
             same_ring(before, after) && ring_covers(after, span, p->reader_impl)) {
-            size_t changed_frames = xz_stem_mix((float *)buffer + span.skip * 2,
-                span.frames, span.source_position, &p->decoded.pcm, get_levels(deck));
+            struct xz_stem_levels levels = get_levels(deck);
+            float values[3] = {levels.drums, levels.harmonics, levels.vocals};
+            if(p->prepared){
+                uint32_t object=(uint32_t)(uintptr_t)self;
+                int32_t loop_in=(int32_t)native_word(object+0x14),loop_out=(int32_t)native_word(object+0x18);
+                int looping=__atomic_load_n((const unsigned char *)(uintptr_t)(object+0x10),__ATOMIC_RELAXED);
+                xz_oc_stream_loop_start(p->prepared,looping&&loop_in>=0&&loop_out>loop_in&&(uint32_t)loop_out<=p->reader_frames?loop_in:-1);
+            }
+            size_t changed_frames = p->prepared ?
+                xz_oc_stream_mix(p->prepared, (float *)buffer + span.skip * 2, span.frames, span.source_position, values) :
+                xz_stem_mix((float *)buffer + span.skip * 2,
+                    span.frames, span.source_position, &p->decoded.pcm, levels);
             if (changed_frames) __atomic_fetch_add(&deck->mixed, 1, __ATOMIC_RELAXED);
         } else __atomic_fetch_add(&deck->skipped, 1, __ATOMIC_RELAXED);
         release(deck);
@@ -410,6 +423,12 @@ static void prepare_deck(int index, struct xz126_deck_source source, uint32_t ge
         strcmp(current.path, source.path) || cancelled(&context)) {
         set_state(deck, gen, XZ_AUDIO_SOURCE_UNSUPPORTED, 0); return;
     }
+    p = calloc(1, sizeof(*p));
+    if (!p) { set_state(deck, gen, XZ_AUDIO_DECODE_FAILED, 0); return; }
+    char prepared_error[160];
+    p->prepared = xz_oc_stream_open(source.path, source.reader_rate, prepared_error, sizeof(prepared_error));
+    if (p->prepared) goto publish;
+    free(p);
     if (!is_wav_or_flac(source.path) || source.file_rate != 44100 ||
         source.reader_rate != 44100 || source.file_frames != source.reader_frames) {
         set_state(deck, gen, XZ_AUDIO_SOURCE_UNSUPPORTED, 0); return;
@@ -431,6 +450,7 @@ static void prepare_deck(int index, struct xz126_deck_source source, uint32_t ge
     if (p->decoded.pcm.frames != source.reader_frames) {
         free_publication(p); set_state(deck, gen, XZ_AUDIO_ALIGNMENT_BLOCKED, 0); return;
     }
+publish:
     p->reader = source.reader;
     p->reader_impl = source.reader_impl;
     p->generation = gen;
@@ -438,8 +458,9 @@ static void prepare_deck(int index, struct xz126_deck_source source, uint32_t ge
     pthread_mutex_lock(&control_mutex);
     if (!cancelled(&context)) {
         __atomic_store_n(&deck->published, p, __ATOMIC_SEQ_CST);
-        deck->status.state = XZ_AUDIO_EXPERIMENTAL_READY;
-        deck->status.pcm_bytes = p->decoded.pcm_bytes;
+        deck->status.state = p->prepared ? XZ_AUDIO_PREPARED_ALIGNING : XZ_AUDIO_EXPERIMENTAL_READY;
+        deck->status.pcm_bytes = p->prepared ? 6u * XZ_OC_WINDOW_FRAMES * 4u : p->decoded.pcm_bytes;
+        deck->status.prepared = p->prepared != NULL;
         p = NULL;
     }
     pthread_mutex_unlock(&control_mutex);
@@ -449,6 +470,12 @@ static void prepare_deck(int index, struct xz126_deck_source source, uint32_t ge
 static void *worker_main(void *unused)
 {
     (void)unused;
+    if (xz_oc_worker_schedule()) {
+        xz_log("stems: background CPU assignment unavailable; native playback retained");
+        for (int i=0;i<DECKS;i++) set_state(&decks[i],decks[i].generation,XZ_AUDIO_HOOK_FAILED,0);
+        return NULL;
+    }
+    xz_log("stems: background workers use CPUs 1-2; native audio affinity unchanged");
     while (__atomic_load_n(&running, __ATOMIC_ACQUIRE)) {
         struct xz126_deck_source source;
         uint32_t gen = 0;
@@ -521,7 +548,32 @@ int xz_audio_get_status(int index, struct xz_audio_status *out)
     out->generation = __atomic_load_n(&decks[index].generation, __ATOMIC_SEQ_CST);
     out->mixed_blocks = __atomic_load_n(&decks[index].mixed, __ATOMIC_RELAXED);
     out->skipped_blocks = __atomic_load_n(&decks[index].skipped, __ATOMIC_RELAXED);
+    struct publication *p = acquire(&decks[index]);
+    if (p) {
+        if (p->prepared) {
+            struct xz_oc_status status;
+            xz_oc_stream_status(p->prepared, &status);
+            out->state = status.state == XZ_OC_READY ? XZ_AUDIO_EXPERIMENTAL_READY :
+                status.state == XZ_OC_ALIGNING ? XZ_AUDIO_PREPARED_ALIGNING :
+                status.state == XZ_OC_BUFFERING ? XZ_AUDIO_PREPARED_BUFFERING : XZ_AUDIO_PREPARED_ERROR;
+            out->alignment_frames = status.lag;
+            out->alignment_correlation = status.correlation;
+            out->skipped_blocks += status.misses;
+        }
+        release(&decks[index]);
+    }
     return 0;
+}
+
+int xz_audio_waveform(int index, unsigned role, unsigned char *bins, size_t count, float *progress)
+{
+    if (index < 0 || index >= DECKS || role >= 3 || !bins || !count) return 0;
+    struct publication *p = acquire(&decks[index]);
+    if (!p) return 0;
+    int available = p->prepared != NULL;
+    if (available) xz_oc_stream_wave(p->prepared, role, bins, count, progress);
+    release(&decks[index]);
+    return available;
 }
 
 int xz_audio_output_deck(const void *manager, uint32_t *rate_out,
@@ -556,7 +608,8 @@ const char *xz_audio_state_name(enum xz_audio_state state)
         "compatible cache missing", "multiple cached models; select separation ID", "decoding stems",
         "stem decode failed or exceeded memory cap", "cached timeline mismatch",
         "experimental stems ready; recorded alignment unverified", "firmware hook installation failed", "disabled",
-        "preferred stem model is invalid or missing; select it again in USB builder"
+        "preferred stem model is invalid or missing; select it again in USB builder",
+        "play briefly to align prepared stems", "loading selected stem mix; playback continues", "prepared stem data or worker setup failed"
     };
     return (unsigned)state < sizeof(names) / sizeof(names[0]) ? names[state] : "unknown";
 }
