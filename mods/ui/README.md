@@ -121,26 +121,29 @@ Physical acceptance of each new runtime remains separate from these tests.
 
 ## Spare channel stem EQ
 
-In MODS > Controls, enable Spare Channel Stem EQ. Channel 3 controls Deck 1
-and channel 4 controls Deck 2. HIGH controls Vocals, MID Harmonics, LOW Drums.
-Centre and clockwise positions retain full volume; turning left fades to zero.
-Each knob picks up the current stem level before it takes control, so enabling,
-resuming, loading a track or using touch controls cannot cause a gain jump.
+The published 0.1.2 runtime does not control stems from the spare EQ knobs on
+the physical XZ. A live CH3 HIGH sweep produced MIDI on the separate mixer USB
+endpoint, while the player hook received no reports. Keep the setting visible,
+but treat it as unavailable until a qualified native input path is installed.
+The XZ Utility's Mixer MIDI Message setting changes the computer USB output;
+it does not deliver those events to the rooted player.
 
-The mode reads the XZ's ordinary mixer MIDI reports inside the player and passes
-them through unchanged. It does not need a DJ application mapping or desktop
-relay. The XZ Utility's Mixer MIDI Message must be set to Send or Send with Time
-Param. A mapping requires a local USB track on its deck and PC selected on its
-spare mixer channel. LINK/PC-deck sources, unknown sources and external channel
-inputs suspend control. The UI remains Waiting until a valid mixer report
-arrives. Suspension leaves the current stem levels unchanged and resets knob
-pickup.
+An offline RAM-only candidate would read the mixer's validated status packet.
+It expects the mixer CPU to publish the six ordinary ADC values to that packet.
+Stock mixer firmware does not do this. The candidate has not been installed in
+the tracked runtime, loaded on the XZ or qualified on hardware. The standalone
+release contains no such patch.
 
-The firmware 1.26 adapter hooks the normal MIDI CC dispatch path. It does not
-request the factory volume-test mode, which changes audio routing. Source and
-input guards, telemetry mapping, stock MIDI passthrough and refusal when the
-guarded hook is unavailable are covered by isolated checks. Physical audio
-acceptance and cold boot remain separate checks for each released runtime.
+The intended mapping is CH3 to Deck 1 and CH4 to Deck 2, with HIGH for Vocals,
+MID for Harmonics and LOW for Drums. Centre and clockwise positions retain full
+volume; turning left fades to zero. Pickup prevents a gain jump. A local USB
+track and PC selected on the corresponding spare channel remain required;
+external inputs and unsupported deck sources suspend control. These rules pass
+isolated tests, but physical EQ audio and normal-mixer acceptance remain open.
+
+The factory volume-test mode exposes ADC values but stops normal mixer work.
+Clearing its flag does not restore those tasks. Do not use it as a performance
+input source. The RAM candidate never requests this mode.
 
 ## Enter and leave the VJ.Tools view
 
