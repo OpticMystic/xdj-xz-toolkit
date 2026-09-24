@@ -22,7 +22,7 @@ static int badge(const struct xz_native_touch*t,const struct xz_touch_status*s) 
         s->x<(uint32_t)(t->badge_x+t->badge_w)&&s->y<(uint32_t)(t->badge_y+t->badge_h);
 }
 static int vj_btn(const struct xz_native_touch*t,const struct xz_touch_status*s) {
- if(!t->model||!t->model->connection.connected)return 0;
+ if(!t->model||!t->model->connection.enabled||!t->model->connection.connected)return 0;
  return s->x>=(uint32_t)t->vj_btn_x&&s->y>=(uint32_t)t->vj_btn_y&&
         s->x<(uint32_t)(t->vj_btn_x+t->vj_btn_w)&&s->y<(uint32_t)(t->vj_btn_y+t->vj_btn_h);
 }
@@ -56,7 +56,7 @@ int xz_native_touch_dispatch(struct xz_native_touch*t,void*self,const struct xz_
   if(t->apply)t->apply(t->context,&act,1);
  }
  if(t->visible&&!t->capture&&(!t->regional||(s->down&&!previous.down&&region(t,s))))t->capture=1;
- if(!t->capture&&!t->visible&&t->model&&t->model->fb_takeover&&t->model->connection.connected){
+ if(!t->capture&&!t->visible&&t->model&&t->model->fb_takeover&&t->model->connection.enabled&&t->model->connection.connected){
   if(previous.down){previous.down=0;stock(self,&previous,mode);}
   t->vj_contact=!!s->down;return 0;
  }

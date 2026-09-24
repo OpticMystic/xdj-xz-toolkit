@@ -29,7 +29,7 @@ static xz_stock_touch stock_touch;
 static void (*forward_touch)(int, int, int);
 static int started, visible, audio_available, key_available, forwarded_down;
 static int fb_takeover_active;
-static int network_connected;
+static int network_enabled, network_connected;
 static char device_ip[16];
 static struct xz_stem_pads pads;
 static int deck_page[2] = {-1,-1};
@@ -418,13 +418,15 @@ __attribute__((visibility("default"))) int xz_mods_native_touch_v1(void) {
 
 __attribute__((visibility("default"))) int xz_mods_takeover_v1(void) {
     return __atomic_load_n(&fb_takeover_active, __ATOMIC_ACQUIRE) &&
+        __atomic_load_n(&network_enabled, __ATOMIC_ACQUIRE) &&
         __atomic_load_n(&network_connected, __ATOMIC_ACQUIRE);
 }
 
 static void badge(uint16_t *pixels, uint32_t stride) {
     xz_ui_render_badge(pixels,stride);
     xz_ui_render_stems_button(pixels,stride,model.stems_overlay);
-    if (model.connection.connected) xz_ui_render_vj_button(pixels, stride, model.fb_takeover);
+    if (model.connection.enabled && model.connection.connected)
+        xz_ui_render_vj_button(pixels, stride, model.fb_takeover);
 }
 
 void xz_ui_runtime_on_source_key(int source) {
@@ -448,6 +450,7 @@ __attribute__((visibility("default"))) int xz_mods_render_v1(uint16_t *pixels, u
         model.connection.ready = 1;
         model.connection.enabled = connection->listening != 0;
         model.connection.connected = connection->connected != 0;
+        __atomic_store_n(&network_enabled, model.connection.enabled, __ATOMIC_RELEASE);
         __atomic_store_n(&network_connected, model.connection.connected, __ATOMIC_RELEASE);
         model.connection.discoverable = connection->discovery != 0;
         model.connection.device_ip = device_ip;
@@ -480,6 +483,7 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     model.fb_takeover = 0;
     model.takeover_assign = XZ_TAKEOVER_LINK;
     __atomic_store_n(&fb_takeover_active, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&network_enabled, 0, __ATOMIC_RELEASE);
     __atomic_store_n(&network_connected, 0, __ATOMIC_RELEASE);
     requested_stems = !!stems_enabled;
     model.settings_status = "SETTINGS NOT SAVED: START FROM USB";

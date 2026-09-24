@@ -36,7 +36,7 @@ int main(void) {
  assert(!touch.visible&&!touch.capture&&solver.previous.down);
  s.down=0;xz_native_touch_dispatch(&touch,&solver,&s,NULL,stock);
  touch.apply=test_apply;
- model.connection.connected=1;
+ model.connection.enabled=1;model.connection.connected=1;
  for(int assignment=0;assignment<3;assignment++){
   model.takeover_assign=assignment;memset(&last_act,0,sizeof(last_act));
   s=(struct xz_touch_status){1,{0,0,0},40,10};int prev_calls=solver.calls;
