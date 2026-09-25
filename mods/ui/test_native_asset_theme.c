@@ -35,13 +35,17 @@ int main(void){
     else if(pixel!=lut[old])changed++;
    }
    if(styled)assert(changed>100);
-   if(styled){
+   if(styled&&theme!=9){
     assert(dest[1+18*STRIDE+64]==(source[18*STRIDE+64]==key?key:lut[source[18*STRIDE+64]]));
     assert(dest[1+STRIDE+64]==(source[STRIDE+64]==key?key:lut[source[STRIDE+64]]));
    }
    check_guards();
   }
  }
+ assert(xz_native_asset_role(1459,784,30).role==XZ_ASSET_FIELD);
+ assert(xz_native_asset_role(650,400,30).role==XZ_ASSET_TITLE_STRIP);
+ assert(xz_native_asset_role(650,399,30).role==XZ_ASSET_UNCLASSIFIED);
+ assert(xz_native_asset_role(1344,240,38).role==XZ_ASSET_UNCLASSIFIED);
  /* Tiny/mismatched IDs never run frame drawing and never touch row padding. */
  for(int theme=0;theme<XZ_THEME_COUNT;theme++){
   reset_dest();assert(xz_native_asset_theme_render(77,theme,source,1,1,STRIDE,dest+1,STRIDE,1,lut,0,source[0],0)==1);

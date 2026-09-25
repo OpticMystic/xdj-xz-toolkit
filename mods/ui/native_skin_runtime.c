@@ -254,8 +254,8 @@ static int build_maps(void){
  for(int theme=0;theme<XZ_THEME_COUNT;theme++){
   uint16_t *lut=maps+(size_t)theme*65536u;
   for(unsigned p=0;p<65536;p++)lut[p]=xz_native_palette_pixel(theme,(uint16_t)p);
-  unsigned char outputs[65536]={0};for(unsigned p=0;p<65536;p++)outputs[lut[p]]=1;
-  for(unsigned p=0;p<65536;p++)if(outputs[p])lut[p]=(uint16_t)p;
+  /* Every caller maps original source colors. Making output colors fixed points
+     would break light themes: Windows ink is black, but source black is paper. */
   lut[0xf81f]=0xf81f;
  }
  return 0;

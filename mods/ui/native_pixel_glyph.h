@@ -41,7 +41,7 @@ static inline int xz_native_text_pixel_glyph(
     if (encoding == 2) {
         if (bitmap->width != 11 || bitmap->height != 23 || bitmap->stride != 3)
             return 0;
-    } else if (encoding == 1 || encoding == 14 || encoding == 16) {
+    } else if (encoding == 1 || encoding == 4 || encoding == 14 || encoding == 16) {
         if (bitmap->width < 5 || bitmap->width > 28 ||
             bitmap->height != 27 || bitmap->stride != 7)
             return 0;

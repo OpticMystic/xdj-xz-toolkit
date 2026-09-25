@@ -15,8 +15,8 @@ int main(void)
     uint8_t storage[191];
     struct xz_native_text_bitmap bitmap={storage+1,189,2,-3,21,27,7};
     struct xz_native_text_glyph_scope scope={1,1,0x206fac,1,storage+1,189};
-    const unsigned encodings[]={1,2,14,16};
-    for(unsigned encoding=0;encoding<4;encoding++) for(unsigned ch=32;ch<=126;ch++) {
+    const unsigned encodings[]={1,2,4,14,16};
+    for(unsigned encoding=0;encoding<5;encoding++) for(unsigned ch=32;ch<=126;ch++) {
         struct xz_native_text_bitmap b=bitmap;
         if(encodings[encoding]==2) { b.width=11; b.height=23; b.stride=3; }
         memset(storage,0x5a,sizeof(storage));

@@ -20,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix='xz-ui-test-') as folder:
         'native-pixel-glyph': ['test_native_pixel_glyph.c'],
         'native-asset-theme': ['test_native_asset_theme.c'],
         'native-window-keys': ['test_native_window_keys.c'],
+        'native-led': ['native_led.c','test_native_led.c'],
         'pad-order': ['ui.c', 'stem_pads.c', 'test_pad_order.c'],
         'ui': ['ui.c', 'test_ui.c'],
         'touch': ['ui.c', 'native_touch.c', 'test_native_touch.c'],
@@ -29,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='xz-ui-test-') as folder:
         'font': ['ui.c', 'test_font.c'],
     }.items():
         output = Path(folder) / (name + '.exe')
-        subprocess.run(common + ['-UNDEBUG'] + [str(root / p) for p in sources] + ['-o', str(output)], check=True)
+        subprocess.run(common + ['-UNDEBUG'] + (['-DXZ_LED_PORTABLE_TEST'] if name=='native-led' else []) + [str(root / p) for p in sources] + ['-o', str(output)], check=True)
         subprocess.run([str(output)], check=True)
     negative = subprocess.run(common + ['-DNDEBUG', '-c', str(root / 'test_stem_pads.c'), '-o', str(Path(folder) / 'negative.o')], capture_output=True, text=True)
     if negative.returncode == 0 or 'Pad acceptance requires active assertions' not in negative.stderr:

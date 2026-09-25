@@ -348,8 +348,9 @@ int xz_ui_runtime_pad_color(int deck,int pad,unsigned *rgb,int *lit) {
     int slot=pad-(model.stem_bank==1?4:0);
     int active = slot>=0&&slot<4&&stem_controls_active(deck) && model.pad_feedback && deck_page[deck] == model.stem_page;
     if (active) {
-        *rgb = slot < 3 ? xz_ui_stem_color(model.theme,xz_stem_for_pad(slot)) : 0xffffffu;
-        *lit = slot < 3 ? !(model.deck[deck].muted & (1u << xz_stem_for_pad(slot))) && !model.deck[deck].bypass : model.deck[deck].bypass;
+        *rgb = xz_stem_hardware_color(slot<3?xz_stem_for_pad(slot):3);
+        *lit = slot < 3 ? !(model.deck[deck].muted & (1u << xz_stem_for_pad(slot))) &&
+            model.deck[deck].levels[xz_stem_for_pad(slot)]>0 && !model.deck[deck].bypass : model.deck[deck].bypass;
     }
     pthread_mutex_unlock(&ui_mutex); return active;
 }
@@ -509,6 +510,12 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     const char *ram_settings = getenv("XZ_MODS_SETTINGS_READONLY");
     settings_readonly = ram_settings && !strcmp(ram_settings,"1");
     if (settings_readonly) model.settings_status = "CHANGES LAST UNTIL REBOOT";
+    const char *forced_theme=getenv("XZ_MODS_THEME");
+    if(forced_theme&&forced_theme[0]>='0'&&forced_theme[0]<='9'&&
+       (!forced_theme[1]||(forced_theme[1]>='0'&&forced_theme[1]<='9'&&!forced_theme[2]))){
+        int chosen=forced_theme[0]-'0';if(forced_theme[1])chosen=chosen*10+forced_theme[1]-'0';
+        if(chosen<XZ_THEME_COUNT)model.theme=chosen;
+    }
     const char *native_view = getenv("XZ_MODS_NATIVE_VIEW");
     if (native_view && !strcmp(native_view,"1")) { model.fb_takeover=0; __atomic_store_n(&fb_takeover_active,0,__ATOMIC_RELEASE); }
     if (audio_ready && force_stems && !strcmp(force_stems,"1")) {

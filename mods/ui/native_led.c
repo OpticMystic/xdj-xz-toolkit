@@ -14,14 +14,14 @@ size_t xz_native_led_apply(void *records,size_t bytes,unsigned count,
  for(unsigned i=0;i<count;i++,p+=XZ_LED_RECORD_BYTES) {
   uint32_t id=word(p),rgb=0;int enabled=0;
   /* Forced native status has priority (e.g. device caution/test state). */
-  if(word(p+4)!=channel||id<0x12||id>0x15||p[0x18])continue;
+  if(word(p+4)!=channel||id<0x12||id>0x19||p[0x18])continue;
   if(!color((int)channel-1,(int)id-0x12,&rgb,&enabled))continue;
   put(p+8,0);put(p+0xc,0);
-  put(p+0x10,1);put(p+0x14,1);
+  put(p+0x10,1);put(p+0x14,enabled?0:1);
   put(p+0x1c,0);put(p+0x20,0);put(p+0x24,0);
-  p[0x28]=(unsigned char)(((rgb>>16)&255u)>>(enabled?0:3));
-  p[0x29]=(unsigned char)(((rgb>>8)&255u)>>(enabled?0:3));
-  p[0x2a]=(unsigned char)((rgb&255u)>>(enabled?0:3));
+  p[0x28]=(unsigned char)((rgb>>16)&255u);
+  p[0x29]=(unsigned char)((rgb>>8)&255u);
+  p[0x2a]=(unsigned char)(rgb&255u);
   /* Leave force clear so the next stock update can restore ordinary cues. */
   changed++;
  }
@@ -61,7 +61,7 @@ static void led_hook(void *player,void *packet) {
     pointer>UINT32_MAX-(uint32_t)count*XZ_LED_RECORD_BYTES)return;
  for(unsigned i=0;i<count;i++) {
   const unsigned char *entry=(const unsigned char*)(uintptr_t)pointer+i*XZ_LED_RECORD_BYTES;
-  if(word(entry)>=0x12&&word(entry)<=0x15) {
+  if(word(entry)>=0x12&&word(entry)<=0x19) {
    TRACE(7);
    if(word(entry+4)==channel) {TRACE(8);if(entry[0x18])TRACE(9);}
   }

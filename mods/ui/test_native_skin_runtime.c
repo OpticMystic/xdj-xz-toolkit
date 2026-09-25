@@ -49,7 +49,7 @@ static void init_fixture(void){
  owner_thread=pthread_self();atomic_store(&owner_ready,1);
  assert(build_maps()==0);
  for(int t=0;t<XZ_THEME_COUNT;t++)for(unsigned p=0;p<65536;p++){
-  const uint16_t *lut=map_for(t);assert(lut[lut[p]]==lut[p]);if(!t)assert(lut[p]==p);
+  const uint16_t *lut=map_for(t);assert(lut[p]==(p==0xf81f?p:xz_native_palette_pixel(t,(uint16_t)p)));if(!t)assert(lut[p]==p);
  }
  pack_size=PACK_COUNT*44+PACK_COUNT*2;original_pack=calloc(1,pack_size);assert(original_pack);
  original_base=0x10000000;

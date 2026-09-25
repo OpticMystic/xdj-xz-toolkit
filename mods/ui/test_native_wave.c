@@ -67,5 +67,11 @@ int main(void) {
     fill();s=scene();assert(xz_native_wave_capture(&pair,&s,0x1fd058,7,pixels,1072));
     assert(xz_native_wave_finish_styled(&pair,&s,7,200,scratch,XZ_NATIVE_WAVE_PIXELS,NULL,NULL,tint,0));
     for(unsigned y=0;y<268;y++)for(unsigned x=0;x<536;x++)assert(pixels[y*536+x]==(uint16_t)(y^0xffff));
+    success=1;
+    for(int repeat=0;repeat<20;repeat++){
+        fill();assert(xz_native_wave_capture(&pair,&s,0x1fd058,7,pixels,1072));
+        assert(xz_native_wave_finish_styled(&pair,&s,7,200,scratch,XZ_NATIVE_WAVE_PIXELS,draw,&success,tint,1));
+        assert(pixels[0]==0xffff&&pixels[536*XZ_NATIVE_WAVE_ROW1_Y]==0xabcd);
+    }
     puts("PASS native wave paired ownership, scene gates, transactional rendering, cue bands and bounds");
 }

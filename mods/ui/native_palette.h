@@ -8,6 +8,15 @@ static inline uint16_t xz_native_palette_pixel(int theme,uint16_t source){
  if(theme<=0||theme>=XZ_THEME_COUNT)return source;
  unsigned r=((source>>11)&31)*255/31,g=((source>>5)&63)*255/63,b=(source&31)*255/31;
  unsigned light=(77*r+150*g+29*b)>>8;
+ if(theme==9){
+  unsigned maximum=r>g?r:g;if(b>maximum)maximum=b;
+  unsigned minimum=r<g?r:g;if(b<minimum)minimum=b;
+  if(maximum>=160&&maximum-minimum>=64){
+   unsigned red=r*4>=maximum*3,green=g*4>=maximum*3,blue=b*4>=maximum*3;
+   return xz_theme_rgb565((red?0x800000u:0)|(green?0x008000u:0)|(blue?0x000080u:0));
+  }
+  return xz_theme_rgb565(light>=192?0x000000:light>=112?0x404040:light>=56?0x808080:0xc0c0c0);
+ }
  if(theme==7){
   const uint32_t tones[4]={0xb5c98b,0x8a9f68,0x4d6041,0x1d2b20};
   return xz_theme_rgb565(tones[light>>6]);

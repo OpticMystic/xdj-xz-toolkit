@@ -1,6 +1,7 @@
 #ifndef XZ_NATIVE_ASSET_THEME_H
 #define XZ_NATIVE_ASSET_THEME_H
 #include "themes.h"
+#include "native_asset_roles.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -30,7 +31,9 @@ static inline int xz_native_asset_theme_render(
   uint16_t pixel=source[y*source_stride+x];
   dest[y*dest_stride+x]=theme==0||(key_enabled&&pixel==key565)?pixel:lut[pixel];
  }
- if(theme==0||asset_id<77||asset_id>86||width!=128||height!=36)return 1;
+ struct xz_asset_role_info role=xz_native_asset_role(asset_id,(unsigned)width,(unsigned)height);
+ int classic=theme==9&&(role.role==XZ_ASSET_BUTTON||role.role==XZ_ASSET_TITLE_STRIP||role.role==XZ_ASSET_TRACK_PANEL);
+ if(theme==0||(!classic&&(asset_id<77||asset_id>86||width!=128||height!=36)))return 1;
  int frame_width=width;
  if(key_enabled){
   int keyed_column=1;
@@ -39,12 +42,32 @@ static inline int xz_native_asset_theme_render(
  }
  struct xz_theme_surface surface={dest,dest_stride,width,height,0,0,width,height};
  const struct xz_theme_palette *palette=xz_theme_palette(theme);
+ if(classic){
+  uint32_t face=0xc0c0c0;
+  if(role.appearance==XZ_ASSET_LIGHT||role.appearance==XZ_ASSET_ORANGE_LIGHT_EDGE)face=0xdfdfdf;
+  else if(role.appearance==XZ_ASSET_DIM)face=0xa0a0a0;
+  else if(role.appearance==XZ_ASSET_PALE)face=0xf0f0f0;
+  else if(role.appearance==XZ_ASSET_FLAT)face=0xb0b0b0;
+  xz_theme_frame(surface,theme,(struct xz_theme_rect){0,0,frame_width,height},face,0,XZ_THEME_BUTTON);
+  if(role.role==XZ_ASSET_TITLE_STRIP){
+   xz_theme_fill(surface,(struct xz_theme_rect){3,3,2,height-6},0x000080);
+   uint16_t original=source[(size_t)(height/2)*source_stride+(size_t)(width/2)];
+   uint16_t accent=lut[original];
+   for(int y=3;y<height-3;y++)for(int x=frame_width-5;x<frame_width-3;x++)dest[(size_t)y*dest_stride+(size_t)x]=accent;
+  }else if(role.appearance==XZ_ASSET_ORANGE_EDGE||role.appearance==XZ_ASSET_ORANGE_LIGHT_EDGE){
+   xz_theme_edge(surface,(struct xz_theme_rect){0,0,frame_width,height},2,0x000080);
+  }else if(role.appearance==XZ_ASSET_WHITE_EDGE){
+   for(int x=4;x<frame_width-4;x+=2){xz_theme_fill(surface,(struct xz_theme_rect){x,4,1,1},0);xz_theme_fill(surface,(struct xz_theme_rect){x,height-5,1,1},0);}
+   for(int y=4;y<height-4;y+=2){xz_theme_fill(surface,(struct xz_theme_rect){4,y,1,1},0);xz_theme_fill(surface,(struct xz_theme_rect){frame_width-5,y,1,1},0);}
+  }
+ }else{
  /* Keep the native outer focus border and interior state contrast. Decorations
     sit inside that border instead of making focused/disabled assets identical. */
  xz_theme_frame(surface,theme,(struct xz_theme_rect){3,3,frame_width-6,height-6},palette->bg,selected!=0,XZ_THEME_BUTTON);
  for(int y=9;y<height-9;y++)for(int x=9;x<frame_width-9;x++){
   uint16_t pixel=source[(size_t)y*source_stride+(size_t)x];
   dest[(size_t)y*dest_stride+(size_t)x]=key_enabled&&pixel==key565?pixel:lut[pixel];
+ }
  }
  if(key_enabled)for(size_t y=0;y<h;y++)for(size_t x=0;x<w;x++)
   if(source[y*source_stride+x]==key565)dest[y*dest_stride+x]=key565;

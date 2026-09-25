@@ -91,7 +91,7 @@ int main(void){
     assert(!xz_ui_runtime_pad_color(0,0,&rgb,&lit));
     e.operation=0;e.pad_page=1;xz_ui_runtime_pad_native_page(0,1);xz_ui_runtime_pad_native_page(1,1);
     assert(xz_ui_runtime_pad(&e,&flags));assert(applied[0].vocals==0);
-    assert(xz_ui_runtime_pad_color(0,0,&rgb,&lit)&&rgb==xz_ui_stem_color(model.theme,2)&&!lit);
+    assert(xz_ui_runtime_pad_color(0,0,&rgb,&lit)&&rgb==xz_stem_hardware_color(2)&&!lit);
     e.operation=2;assert(xz_ui_runtime_pad(&e,&flags));
     struct xz_ui_action action={0};action.kind=XZ_UI_MUTE;action.deck=0;action.index=2;action.phase=XZ_UI_PRESS;
     apply(NULL,&action,1);assert(applied[0].vocals==1);
@@ -125,5 +125,20 @@ int main(void){
     contact(self,40,10,1);contact(self,40,10,0);assert(!model.fb_takeover);
     contact(self,350,350,1);contact(self,350,350,0);assert(stock_calls>native_before);
     contact(self,40,10,1);contact(self,40,10,0);assert(model.fb_takeover);
-    puts("PASS two-deck stem controls, waveform gestures, VJ view and touch ownership");return 0;
+    model.pad_feedback=1;model.enabled=XZ_UI_STEM;
+    for(int theme=0;theme<XZ_THEME_COUNT;theme++)for(int bank=0;bank<2;bank++)for(int page=0;page<4;page++)for(int deck=0;deck<2;deck++){
+        model.theme=theme;model.stem_bank=bank;model.stem_page=page;model.deck[deck].muted=0;model.deck[deck].bypass=0;
+        for(int stem=0;stem<3;stem++)model.deck[deck].levels[stem]=1;
+        xz_ui_runtime_pad_native_page(deck,page);
+        for(int pad=0;pad<8;pad++){
+            int slot=pad-bank*4;int active=xz_ui_runtime_pad_color(deck,pad,&rgb,&lit);
+            assert(active==(slot>=0&&slot<4));
+            if(active){assert(rgb==xz_stem_hardware_color(slot<3?2-slot:3));assert(lit==(slot<3));}
+        }
+        model.deck[deck].levels[2]=0;assert(xz_ui_runtime_pad_color(deck,bank*4,&rgb,&lit)&&!lit);
+        model.deck[deck].bypass=1;assert(xz_ui_runtime_pad_color(deck,bank*4+3,&rgb,&lit)&&lit);
+        assert(xz_ui_runtime_pad_color(deck,bank*4+1,&rgb,&lit)&&!lit);
+        xz_ui_runtime_pad_native_page(deck,(page+1)%4);assert(!xz_ui_runtime_pad_color(deck,bank*4,&rgb,&lit));
+    }
+    puts("PASS two-deck stem controls, waveform gestures, VJ view, all theme/page/bank LEDs and touch ownership");return 0;
 }

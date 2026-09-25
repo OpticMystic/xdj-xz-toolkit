@@ -108,6 +108,11 @@ independent while MODS or the inline strip is hidden. Turning stems off restores
 normal pad dispatch, including paired releases for presses already owned by the
 mod.
 
+Physical pad colors stay green for Vocals, blue for Harmonics, red for Drums
+and white for Bypass, independent of the display theme. Active pads use native
+normal brightness; muted or zero-volume stems are dim. Bypass lights white
+when enabled. Both A-D and E-H LED records follow the selected stem page.
+
 Touch and pad mute controls share one latch. In the inline strip, tapping a
 stem toggles it and dragging adjusts its level. Raising a muted stem with a
 drag unmutes it. Inline waveform placement uses the same
