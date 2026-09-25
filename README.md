@@ -33,7 +33,24 @@ accepted; unknown versions fail closed.
 - `tests/` — `test_toolkit.py` (public closure: tooling present, private
   inputs absent), `test_mod_payload.py` (payload/launcher contract)
 
-## Test
+## Current development source
+
+The September 24 source adds two 48-pixel stem rows, horizontal volume gestures,
+streamlined MODS navigation, native interface themes and corrected physical pad
+brightness across both banks. Split rows, clean playback and bright pads were
+confirmed in RAM trials, including the final primary pad colors. Theme coverage and
+cold-boot/two-deck qualification remain pending. These changes are newer than
+the standalone 0.1.2 download.
+
+See the [user guide and actual hardware screenshots](https://github.com/OpticMystic/XZ-Mods/blob/main/docs/USER-GUIDE.md)
+and [website](https://vj.tools/xz-mods) for setup and controls.
+
+Related projects: [CDJ3K-Mods](https://cdj3k-mods.com/),
+[OverCue](https://overcue.gg/), [XDJ-RX3 Toolkit](https://github.com/Tratosca/rx3-toolkit)
+and [XDJ-AZ Mods](https://github.com/Kyle-Hosman/xdj-az-mods).
+Each project has separate hardware and installation requirements.
+
+## Run tests
 
 ```powershell
 python -m unittest tests.test_toolkit tests.test_mod_payload -v
