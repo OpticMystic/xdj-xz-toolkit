@@ -1,10 +1,10 @@
 {
   "name": "@vj-tools/xdj-xz-toolkit",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": false,
   "license": "MIT",
   "repository": "https://github.com/OpticMystic/xdj-xz-toolkit",
-  "description": "XDJ-XZ USB builder inputs and ARM display hook sources (firmware and keys user-supplied)",
+  "description": "XDJ-XZ USB builder and ARM display hook sources (verified firmware and boot support downloaded at build time)",
   "scripts": {
     "build": "node -e \"console.log('xdj-xz-toolkit: vendored Python/native inputs; no Node build step')\"",
     "build:arm-hook": "powershell -ExecutionPolicy Bypass -File vendor/tools/xz_runtime/build_hook.ps1 -Output build/libxz-directfb-hook-repo-built-abi14.so",

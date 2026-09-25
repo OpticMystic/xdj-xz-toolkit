@@ -1,18 +1,20 @@
 # xdj-xz-toolkit
 
 Public XDJ-XZ USB builder inputs and ARM display-hook sources for firmware
-1.26. Version 0.1.4 is a developer preview; final native-player and cold-boot qualification remains pending.
+1.26. Version 0.1.5 is a developer preview; final native-player and cold-boot qualification remains pending.
 
 ## What this is not
 
 This repository never ships firmware, boot keys, decrypted images, extracted
-`rbp` binaries, loader data, model weights, or built device artifacts. Those
-are always user-supplied from their original publishers:
+`rbp` binaries, loader data, model weights, or built device artifacts. The
+standalone app downloads the pinned official firmware and boot support from
+manufacturer sources when preparing a USB; local inputs remain available:
 
 - Official XDJ-XZ v1.26 ZIP (extract `XDJXZ.UPD` locally):
   https://downloads.support.alphatheta.com/firmwares/all-in-one-dj-systems/XDJ-XZ/XDJXZ_v126.zip
-- Your local boot key (`--key <aes256.key>`, or `vendor/keys/aes256.key`,
-  which is git-ignored — see `vendor/keys/README.md`)
+- A local boot key (`--key <aes256.key>`, or `vendor/keys/aes256.key`) remains
+  an advanced input. Automatic preparation extracts verified boot support from
+  Pioneer's published source archive into the app-local cache.
 - Separation model checkpoints listed in `builder/models.json` (downloaded
   from their original sources when requested)
 

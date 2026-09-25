@@ -11,6 +11,15 @@ import re
 from . import cache,usb
 from .jobs import Job,Cancelled
 
+FIRMWARE_126={'filename':'XDJXZ_v126.zip',
+    'url':'https://downloads.support.alphatheta.com/firmwares/all-in-one-dj-systems/XDJ-XZ/XDJXZ_v126.zip',
+    'sha256':'7c4159ca90b0cfd651725a68e10a11cf1a621239f703a0071f24355cc89fed7f','bytes':70775680}
+
+def official_firmware(job):
+    from .engines import data_root,download
+    job.progress('download','Getting the official XDJ-XZ 1.26 firmware from AlphaTheta')
+    return download(FIRMWARE_126,data_root()/'local-firmware',job)
+
 def resources():
     configured=os.environ.get('XZ_BUILDER_RESOURCES')
     if not configured:raise ValueError('Builder resources are not configured')
@@ -21,7 +30,7 @@ def status():
     manifest=json.loads(runtime.read_text()) if runtime.exists() else None
     catalog_path=Path(__file__).with_name('models.json')
     catalog=json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
-    return {'name':'XZ Mods','version':'0.1.4-preview','firmware':'XDJ-XZ 1.26',
+    return {'name':'XZ Mods','version':'0.1.5-preview','firmware':'XDJ-XZ 1.26',
         'prepared_formats':['overcue-stems/4','stemd-cache/1'],
         'separation_output_format':'stemd-cache/1',
         'release_ready':False,'runtime_present':manifest is not None,'runtime':manifest,
@@ -99,21 +108,31 @@ def dispatch(request,job):
         output=job.run([resources()/'xz-overcue-check.exe',source])
         return json.loads(output)
     if method=='download_firmware':
-        from .engines import data_root,download
-        record={'filename':'XDJXZ_v126.zip','url':'https://downloads.support.alphatheta.com/firmwares/all-in-one-dj-systems/XDJ-XZ/XDJXZ_v126.zip',
-            'sha256':'7c4159ca90b0cfd651725a68e10a11cf1a621239f703a0071f24355cc89fed7f','bytes':70775680}
-        job.progress('download','Downloading the official XZ 1.26 firmware from AlphaTheta')
-        path=download(record,data_root()/'local-firmware',job)
-        return {'firmware_path':str(path),'sha256':record['sha256'],'source':'AlphaTheta','local_input_only':True}
+        path=official_firmware(job)
+        return {'firmware_path':str(path),'sha256':FIRMWARE_126['sha256'],'source':'AlphaTheta','local_input_only':True}
     if method=='inspect_audio':return cache.inspect_audio(request['source'])
     if method=='inspect_cache':return inspect_cache_entry(request['entry'],request['source'])
-    if method=='inspect_firmware':return usb.inspect_inputs(request['firmware'],request['key'])
+    if method=='inspect_firmware':
+        from .boot_support import ensure_boot_key
+        key=request.get('key') or ensure_boot_key(job)
+        return usb.inspect_inputs(request['firmware'],key)
     if method=='import_stems':return import_stems(request,job)
     if method=='import_branding':
         from .branding import import_branding
         return import_branding(request,job)
     if method=='build_usb':
-        return usb.build_usb(request['volume'],request['firmware'],request['key'],resources(),job,request.get('experimental') is True)
+        from .boot_support import ensure_boot_key
+        if request.get('experimental') is not True:raise ValueError('Review the experimental build notice before preparing a USB')
+        key=request.get('key') or ensure_boot_key(job)
+        return usb.build_usb(request['volume'],request['firmware'],key,resources(),job,True)
+    if method=='prepare_usb':
+        from .boot_support import ensure_boot_key
+        if request.get('experimental') is not True:raise ValueError('Review the experimental build notice before preparing a USB')
+        volume=usb.require_usb_root(request['volume'])
+        firmware=official_firmware(job)
+        key=ensure_boot_key(job)
+        result=usb.build_usb(volume,firmware,key,resources(),job,True)
+        return {**result,'firmware_source':'AlphaTheta','one_step':True}
     if method in ('setup_engine','separate'):
         from .engines import setup,separate
         return setup(request,job,resources()) if method=='setup_engine' else separate(request,job,resources())

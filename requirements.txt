@@ -1,2 +1,3 @@
 cryptography>=42,<47
 pycdlib>=1.14,<2
+inflate64==1.0.4
