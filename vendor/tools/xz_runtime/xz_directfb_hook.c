@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "mods_bridge.h"
+#include "../../../mods/ui/pixel_font.h"
 
 typedef DFBResult (*DirectFBCreateFn)(IDirectFB **ret_interface);
 typedef DFBResult (*CreateSurfaceFn)(
@@ -87,6 +88,11 @@ static ReadFn original_read;
 static WriteFn original_write;
 static IoctlFn original_ioctl;
 static FlipFn original_primary_flip;
+typedef DFBResult (*SurfaceColorFn)(IDirectFBSurface *,uint8_t,uint8_t,uint8_t,uint8_t);
+typedef DFBResult (*SurfaceStringFn)(IDirectFBSurface *,const char *,int,int,int,DFBSurfaceTextFlags);
+static SurfaceColorFn original_surface_color, original_surface_clear;
+static SurfaceStringFn original_surface_string;
+__attribute__((visibility("default"))) uint32_t xz_native_surface_style_proof_v1[8]={1};
 static IDirectFBSurface *primary_surface;
 static IDirectFB *directfb_interface;
 static int directfb_suspended;
@@ -109,6 +115,9 @@ static xz_mods_visible_fn_v1 mods_visible;
 static xz_mods_native_touch_fn_v1 mods_native_touch;
 static xz_mods_render_fn_v1 mods_render;
 static xz_mods_takeover_fn_v1 mods_takeover;
+static xz_mods_native_color_fn_v1 mods_native_color;
+static xz_mods_native_surface_color_fn_v1 mods_native_surface_color;
+static xz_mods_native_style_fn_v1 mods_native_style;
 static uint32_t vj_listener_ready;
 static uint32_t vj_discovery_ready;
 static uint32_t vj_received_image_count;
@@ -272,6 +281,9 @@ static void resolve_mods_bridge(void) {
     mods_native_touch = (xz_mods_native_touch_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_native_touch_v1");
     mods_render = (xz_mods_render_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_render_v1");
     mods_takeover = (xz_mods_takeover_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_takeover_v1");
+    mods_native_color = (xz_mods_native_color_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_native_color_v1");
+    mods_native_surface_color = (xz_mods_native_surface_color_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_native_surface_color_v1");
+    mods_native_style = (xz_mods_native_style_fn_v1)dlsym(RTLD_DEFAULT, "xz_mods_native_style_v1");
 }
 
 static int mods_panel_visible(void) {
@@ -1509,12 +1521,99 @@ static DFBResult hooked_get_input_device(
     return result;
 }
 
+static uint32_t native_style_rgba(IDirectFBSurface *surface,uint8_t r,uint8_t g,uint8_t b,uint8_t a) {
+    uint32_t rgba=(uint32_t)r|((uint32_t)g<<8)|((uint32_t)b<<16)|((uint32_t)a<<24);
+    if(mods_native_surface_color)return mods_native_surface_color((uint32_t)(uintptr_t)surface,rgba);
+    return mods_native_color?mods_native_color(rgba):rgba;
+}
+static DFBResult styled_surface_color(IDirectFBSurface *surface,uint8_t r,uint8_t g,uint8_t b,uint8_t a) {
+    uint32_t color=native_style_rgba(surface,r,g,b,a);
+    __atomic_fetch_add(&xz_native_surface_style_proof_v1[1],1,__ATOMIC_RELAXED);
+    return original_surface_color(surface,(uint8_t)color,(uint8_t)(color>>8),(uint8_t)(color>>16),(uint8_t)(color>>24));
+}
+static DFBResult styled_surface_clear(IDirectFBSurface *surface,uint8_t r,uint8_t g,uint8_t b,uint8_t a) {
+    uint32_t color=native_style_rgba(surface,r,g,b,a);
+    __atomic_fetch_add(&xz_native_surface_style_proof_v1[2],1,__ATOMIC_RELAXED);
+    return original_surface_clear(surface,(uint8_t)color,(uint8_t)(color>>8),(uint8_t)(color>>16),(uint8_t)(color>>24));
+}
+static DFBResult styled_surface_string(IDirectFBSurface *surface,const char *text,int bytes,int x,int y,DFBSurfaceTextFlags flags) {
+    int theme=mods_native_style?mods_native_style():0;
+    IDirectFBFont *font=NULL;int ascender=0,widths[257]={0},length;
+    DFBRectangle rectangles[128];int rectangle_count=0;
+    if((theme!=7&&theme!=10)||!text||flags||bytes< -1||bytes>256||x< -4096||x>4096||y< -4096||y>4096)
+        goto stock;
+    length=bytes<0?(int)strnlen(text,257):bytes;
+    if(length<1||length>256)goto stock;
+    for(int i=0;i<length;i++)if((unsigned char)text[i]<32||(unsigned char)text[i]>126)goto stock;
+    if(surface->GetFont(surface,&font)!=DFB_OK||!font)goto stock;
+    if(font->GetAscender(font,&ascender)!=DFB_OK||ascender<7||ascender>64)goto release_stock;
+    for(int i=1;i<=length;i++){
+        if(font->GetStringWidth(font,text,i,&widths[i])!=DFB_OK||widths[i]<widths[i-1]||widths[i]>4096)goto release_stock;
+        if(text[i-1]!=' '&&widths[i]==widths[i-1])goto release_stock;
+    }
+    font->Release(font);font=NULL;
+    for(int i=0;i<length;i++)for(int row=0;row<7;row++){
+        unsigned bits=xz_pixel_font_row((unsigned char)text[i],(unsigned)row);
+        int advance=widths[i+1]-widths[i],ink_width=advance>5?advance-1:advance;
+        for(int col=0;col<5;){
+            if(!(bits&(1u<<(4-col)))){col++;continue;}
+            int end=col+1;while(end<5&&(bits&(1u<<(4-end))))end++;
+            int left=x+widths[i]+col*ink_width/5,right=x+widths[i]+end*ink_width/5;
+            int top=y-ascender+row*ascender/7,bottom=y-ascender+(row+1)*ascender/7;
+            if(right>left&&bottom>top){
+                rectangles[rectangle_count++]=(DFBRectangle){left,top,right-left,bottom-top};
+                if(rectangle_count==128){
+                    DFBResult result=surface->FillRectangles(surface,rectangles,rectangle_count);
+                    if(result!=DFB_OK)return result;
+                    rectangle_count=0;
+                }
+            }
+            col=end;
+        }
+    }
+    if(rectangle_count){DFBResult result=surface->FillRectangles(surface,rectangles,rectangle_count);if(result!=DFB_OK)return result;}
+    __atomic_fetch_add(&xz_native_surface_style_proof_v1[3],1,__ATOMIC_RELAXED);
+    return DFB_OK;
+release_stock:
+    font->Release(font);
+stock:
+    __atomic_fetch_add(&xz_native_surface_style_proof_v1[4],1,__ATOMIC_RELAXED);
+    return original_surface_string(surface,text,bytes,x,y,flags);
+}
+static void hook_native_surface_style(IDirectFBSurface *surface) {
+    if(!surface||!mods_native_color)return;
+    DFBSurfacePixelFormat format=DSPF_UNKNOWN;
+    if(surface->GetPixelFormat(surface,&format)!=DFB_OK||format!=DSPF_RGB16)return;
+    if(surface->SetColor!=styled_surface_color){
+        SurfaceColorFn candidate=surface->SetColor,empty=NULL;
+        __atomic_compare_exchange_n(&original_surface_color,&empty,candidate,0,__ATOMIC_RELEASE,__ATOMIC_RELAXED);
+        if(candidate&&__atomic_load_n(&original_surface_color,__ATOMIC_ACQUIRE)==candidate){surface->SetColor=styled_surface_color;__atomic_fetch_add(&xz_native_surface_style_proof_v1[5],1,__ATOMIC_RELAXED);}
+        else __atomic_fetch_add(&xz_native_surface_style_proof_v1[7],1,__ATOMIC_RELAXED);
+    }
+    if(surface->Clear!=styled_surface_clear){
+        SurfaceColorFn candidate=surface->Clear,empty=NULL;
+        __atomic_compare_exchange_n(&original_surface_clear,&empty,candidate,0,__ATOMIC_RELEASE,__ATOMIC_RELAXED);
+        if(candidate&&__atomic_load_n(&original_surface_clear,__ATOMIC_ACQUIRE)==candidate)surface->Clear=styled_surface_clear;
+    }
+    if(surface->DrawString!=styled_surface_string){
+        SurfaceStringFn candidate=surface->DrawString,empty=NULL;
+        __atomic_compare_exchange_n(&original_surface_string,&empty,candidate,0,__ATOMIC_RELEASE,__ATOMIC_RELAXED);
+        if(candidate&&__atomic_load_n(&original_surface_string,__ATOMIC_ACQUIRE)==candidate){surface->DrawString=styled_surface_string;__atomic_fetch_add(&xz_native_surface_style_proof_v1[6],1,__ATOMIC_RELAXED);}
+    }
+}
+
+__attribute__((visibility("default"))) void xz_vj_skin_surface_v1(uint32_t surface) {
+    pthread_once(&mods_bridge_once,resolve_mods_bridge);
+    hook_native_surface_style((IDirectFBSurface *)(uintptr_t)surface);
+}
+
 static DFBResult hooked_create_surface(
     IDirectFB *thiz,
     const DFBSurfaceDescription *desc,
     IDirectFBSurface **ret_interface
 ) {
     DFBResult result = original_create_surface(thiz, desc, ret_interface);
+    if(result==DFB_OK&&ret_interface&&*ret_interface)hook_native_surface_style(*ret_interface);
     if (
         result == DFB_OK && ret_interface && *ret_interface && desc &&
         (desc->flags & DSDESC_CAPS) && (desc->caps & DSCAPS_PRIMARY)
@@ -1528,6 +1627,7 @@ static DFBResult hooked_create_surface(
 }
 
 static void hook_primary_surface(IDirectFBSurface *surface, const char *source) {
+    hook_native_surface_style(surface);
     if (!surface || surface->Flip == hooked_primary_flip) return;
     primary_surface = surface;
     original_primary_flip = surface->Flip;

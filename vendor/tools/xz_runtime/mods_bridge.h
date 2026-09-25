@@ -20,6 +20,9 @@ typedef int (*xz_mods_native_touch_fn_v1)(void);
 typedef int (*xz_mods_render_fn_v1)(uint16_t *, uint32_t, uint32_t, uint32_t,
                                    const struct xz_vj_connection_v1 *);
 typedef int (*xz_mods_takeover_fn_v1)(void);
+typedef uint32_t (*xz_mods_native_color_fn_v1)(uint32_t rgba);
+typedef uint32_t (*xz_mods_native_surface_color_fn_v1)(uint32_t surface,uint32_t rgba);
+typedef int (*xz_mods_native_style_fn_v1)(void);
 
 /* Optional mod exports, resolved dynamically. Zero from render means no draw. */
 int xz_mods_visible_v1(void);

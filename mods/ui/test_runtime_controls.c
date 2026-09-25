@@ -11,6 +11,10 @@ static struct xz_touch_status last_stock;
 static struct xz_stem_levels applied[2];
 static uint32_t fixture_generation=1;
 static unsigned waveform_calls[2];
+int xz_native_skin_start(int theme){(void)theme;return 0;}
+void xz_native_skin_request(int theme){(void)theme;}
+const char *xz_native_skin_status(void){return "Native theme test fixture";}
+void xz_native_skin_stop(void){}
 int xz_native_focus_deck(void){return fixture_focus;}
 int xz_native_inline_active(void){return native_active;}
 int xz_native_inline_start(int(*on)(void),xz_native_wave_render draw,void *context){(void)on;(void)draw;(void)context;return 0;}

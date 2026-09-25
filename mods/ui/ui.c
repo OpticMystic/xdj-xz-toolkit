@@ -80,6 +80,16 @@ static struct xz_theme_surface themed(struct canvas c){
 static void frame(struct canvas c,int theme,struct xz_ui_widget a,uint32_t fill,int selected){
  xz_theme_frame(themed(c),theme,(struct xz_theme_rect){a.x,a.y,a.w,a.h},fill,selected,XZ_THEME_BUTTON);
 }
+void xz_ui_render_native_buttons(uint16_t *pixels,size_t stride,int theme,int stems,int vj_visible,int vj_active){
+ if(!pixels||stride<800)return;
+ if(!theme){xz_ui_render_badge(pixels,stride);xz_ui_render_stems_button(pixels,stride,stems);if(vj_visible)xz_ui_render_vj_button(pixels,stride,vj_active);return;}
+ struct canvas c={pixels,stride,800,480,theme};const struct xz_theme_palette *p=xz_theme_palette(theme);
+ struct xz_ui_widget buttons[3]={{744,0,56,24,XZ_UI_NONE,0,0,"MODS",-1},{674,0,68,24,XZ_UI_NONE,0,0,"STEMS",-1},{0,0,112,24,XZ_UI_NONE,0,0,vj_active?"EXIT VJ":"VJ.TOOLS",-1}};
+ for(int i=0;i<(vj_visible?3:2);i++){
+  struct xz_ui_widget a=buttons[i];frame(c,theme,a,p->bg,i==1?stems:i==2?vj_active:0);
+  text(c,a.x+6,a.y+7,a.label,1,(a.w-12)/6,p->ink);
+ }
+}
 static void deck_card(struct canvas c,const struct xz_ui_widget *a,int selected,const struct xz_theme_palette *p){
  uint32_t edge=selected?p->accent:blend(p->bg,p->ink,112);
  for(int row=0;row<a->h;row++){
@@ -301,7 +311,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
   text(c,12,412,"BYPASS RETURNS THAT DECK TO THE ORIGINAL MIX.",1,126,dim);
   if(u->notice[0])text(c,12,430,u->notice,1,115,p->alarm);
  }
- else if(u->page==XZ_UI_THEMES)text(c,12,112,"CHOOSE A LOOK FOR MODS AND THE STEM ROWS",2,62,p->ink);
+ else if(u->page==XZ_UI_THEMES)text(c,12,112,"CHOOSE A LOOK FOR THE WHOLE XZ INTERFACE",2,62,p->ink);
  else if(u->page==XZ_UI_CONNECTION){
   const struct xz_ui_connection *v=&m->connection;
   text(c,12,152,"VJ.TOOLS CONNECTION",2,50,p->ink);
@@ -328,7 +338,7 @@ int xz_ui_render(const struct xz_ui *u,const struct xz_ui_model *m,uint16_t *pix
  }
 
  rect(c,0,451,800,29,blend(p->bg,p->ink,20));rect(c,0,451,800,1,blend(p->bg,p->ink,90));
- text(c,12,461,u->page==XZ_UI_CONTROLS?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):u->notice[0]?u->notice:((u->page==XZ_UI_SETTINGS||u->page==XZ_UI_CONTROLS)?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):(u->page==XZ_UI_CONNECTION?(m->connection.status?m->connection.status:(m->connection.ready&&m->connection.connected?"VJ.Tools CONNECTED":"VJ.Tools CONNECTION AVAILABLE")):(d->status?d->status:"LOAD A TRACK TO USE DECK CONTROLS"))),1,126,u->notice[0]?p->alarm:dim);
+ text(c,12,461,u->page==XZ_UI_THEMES&&m->theme_status?m->theme_status:u->page==XZ_UI_CONTROLS?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):u->notice[0]?u->notice:((u->page==XZ_UI_SETTINGS||u->page==XZ_UI_CONTROLS)?(m->settings_status?m->settings_status:"INSERT USB TO SAVE SETTINGS"):(u->page==XZ_UI_CONNECTION?(m->connection.status?m->connection.status:(m->connection.ready&&m->connection.connected?"VJ.Tools CONNECTED":"VJ.Tools CONNECTION AVAILABLE")):(d->status?d->status:"LOAD A TRACK TO USE DECK CONTROLS"))),1,126,u->notice[0]?p->alarm:dim);
  return 1;
 }
 static struct xz_ui_action action(enum xz_ui_action_kind kind,enum xz_ui_phase phase,int deck,int index,float value,float second){

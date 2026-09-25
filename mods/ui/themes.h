@@ -19,7 +19,7 @@ static inline const struct xz_theme_palette *xz_theme_palette(int theme) {
  {0x1e1e2e,0xcdd6f4,0xcba6f7,0xfab387,{0xf38ba8,0x89b4fa,0xa6e3a1}},
  {0x141414,0xf0fef9,0x00e575,0xd451ff,{0xff4fc3,0x006afb,0x00e575}},
  {0xfbf0d9,0x262a44,0x393f61,0xfdb03f,{0xe8705d,0x393f61,0x869a5f}},
- {0x9bbc0f,0x0f380f,0x306230,0x0f380f,{0x0f380f,0x306230,0x306230}},
+ {0xb5c98b,0x1d2b20,0x4d6041,0x1d2b20,{0x1d2b20,0x4d6041,0x4d6041}},
  {0xd7d5e4,0x29233f,0x65549c,0x9b2638,{0xb33250,0x465b98,0x276951}},
  {0xc0c0c0,0x000000,0x000080,0x800000,{0x800000,0x000080,0x006000}},
  {0xe8edb0,0x25304f,0x483b89,0xa33149,{0xa33149,0x23538e,0x246344}},
@@ -55,6 +55,10 @@ static inline void xz_theme_edge(struct xz_theme_surface s,struct xz_theme_rect 
 }
 static inline void xz_theme_background(struct xz_theme_surface s,int theme,struct xz_theme_rect r) {
  const struct xz_theme_palette *p=xz_theme_palette(theme);xz_theme_fill(s,r,p->bg);
+ if(theme==7)for(int y=0;y<r.h;y+=8)for(int x=0;x<r.w;x+=8){
+  xz_theme_fill(s,(struct xz_theme_rect){r.x+x,r.y+y,1,1},0x8a9f68);
+  if(x+4<r.w&&y+4<r.h)xz_theme_fill(s,(struct xz_theme_rect){r.x+x+4,r.y+y+4,1,1},0x8a9f68);
+ }
  if(theme==11)for(int y=2;y<r.h;y+=4)xz_theme_fill(s,(struct xz_theme_rect){r.x,r.y+y,r.w,1},0xf4f7fa);
  if(theme==10)for(int y=0;y<r.h;y+=8)for(int x=0;x<r.w;x+=8)xz_theme_fill(s,(struct xz_theme_rect){r.x+x,r.y+y,2,2},0xd5dda2);
 }
@@ -63,15 +67,21 @@ static inline void xz_theme_background(struct xz_theme_surface s,int theme,struc
 static inline void xz_theme_frame(struct xz_theme_surface s,int theme,struct xz_theme_rect r,uint32_t fill,int selected,enum xz_theme_role role) {
  const struct xz_theme_palette *p=xz_theme_palette(theme);
  if(r.w<=0||r.h<=0)return;
- if(theme==7)fill=selected?0x8bac0f:0x9bbc0f;
+ if(theme==7)fill=selected?0x8a9f68:p->bg;
  xz_theme_fill(s,r,fill);
  if(theme<7||theme>=XZ_THEME_COUNT){xz_theme_edge(s,r,0,selected?p->accent:xz_theme_mix(p->bg,p->ink,112));return;}
  if(theme==7||theme==10){
-  uint32_t dark=p->ink,light=theme==7?0x9bbc0f:0xf7f6da;
+  uint32_t dark=p->ink,light=theme==7?p->bg:0xf7f6da;
   xz_theme_edge(s,r,0,dark);xz_theme_edge(s,r,1,dark);xz_theme_edge(s,r,2,light);xz_theme_edge(s,r,3,dark);
   if(r.w>16&&r.h>16){
    xz_theme_fill(s,(struct xz_theme_rect){r.x,r.y,3,3},p->bg);xz_theme_fill(s,(struct xz_theme_rect){r.x+r.w-3,r.y,3,3},p->bg);
    xz_theme_fill(s,(struct xz_theme_rect){r.x,r.y+r.h-3,3,3},p->bg);xz_theme_fill(s,(struct xz_theme_rect){r.x+r.w-3,r.y+r.h-3,3,3},p->bg);
+   if(theme==7&&role!=XZ_THEME_BUTTON){
+    xz_theme_fill(s,(struct xz_theme_rect){r.x+4,r.y+4,2,2},p->accent);
+    xz_theme_fill(s,(struct xz_theme_rect){r.x+r.w-6,r.y+4,2,2},p->accent);
+    xz_theme_fill(s,(struct xz_theme_rect){r.x+4,r.y+r.h-6,2,2},p->accent);
+    xz_theme_fill(s,(struct xz_theme_rect){r.x+r.w-6,r.y+r.h-6,2,2},p->accent);
+   }
   }
   if(selected)xz_theme_fill(s,(struct xz_theme_rect){r.x+5,r.y+6,2,r.h-12},theme==7?dark:p->accent);
  }else if(theme==8){

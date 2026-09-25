@@ -63,6 +63,7 @@ struct xz_ui_model {
     int fb_takeover, takeover_assign, stems_overlay;
     int stem_bank;
     const char *settings_status;
+    const char *theme_status;
 };
 struct xz_ui {
     enum xz_ui_page page;
@@ -97,4 +98,5 @@ size_t xz_ui_inline_touch(struct xz_ui *,const struct xz_ui_model *,int width,in
 void xz_ui_render_badge(uint16_t *pixels,size_t stride);
 void xz_ui_render_stems_button(uint16_t *pixels,size_t stride,int enabled);
 void xz_ui_render_vj_button(uint16_t *pixels,size_t stride,int takeover_active);
+void xz_ui_render_native_buttons(uint16_t *pixels,size_t stride,int theme,int stems,int vj_visible,int vj_active);
 #endif

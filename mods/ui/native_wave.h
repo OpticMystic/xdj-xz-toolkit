@@ -31,6 +31,7 @@ struct xz_native_wave_pair {
 };
 typedef int (*xz_native_wave_render)(void *context,uint16_t *pixels,
                                     size_t count,size_t stride,int width,int height);
+typedef void (*xz_native_wave_style)(uint16_t *,uint32_t);
 int xz_native_wave_scene_valid(const struct xz_native_wave_scene *);
 void xz_native_wave_reset(struct xz_native_wave_pair *);
 /* Call after stock GR lock. The adapter supplies only freshly returned outputs,
@@ -44,4 +45,7 @@ int xz_native_wave_capture(struct xz_native_wave_pair *,const struct xz_native_w
 int xz_native_wave_finish(struct xz_native_wave_pair *,const struct xz_native_wave_scene *,
                          uintptr_t thread,uintptr_t hw,uint16_t *scratch,size_t count,
                          xz_native_wave_render,void *context);
+int xz_native_wave_finish_styled(struct xz_native_wave_pair *,const struct xz_native_wave_scene *,
+                         uintptr_t thread,uintptr_t hw,uint16_t *scratch,size_t count,
+                         xz_native_wave_render,void *context,xz_native_wave_style,int inline_rows);
 #endif

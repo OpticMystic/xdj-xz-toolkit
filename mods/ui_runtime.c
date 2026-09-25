@@ -7,6 +7,7 @@
 #include "ui/stem_pads.h"
 #include "ui/native_led.h"
 #include "ui/native_wave_runtime.h"
+#include "ui/native_skin_runtime.h"
 #include "ui/wave_viewport.h"
 #include "settings.h"
 #include "../vendor/tools/xz_runtime/mods_bridge.h"
@@ -156,7 +157,7 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
             if (a->deck >= 0 && a->deck < 2) { model.deck[a->deck].bypass = a->value != 0; levels(a->deck); }
             break;
         case XZ_UI_SET_THEME:
-            if (a->index >= 0 && a->index < XZ_THEME_COUNT) model.theme = a->index;
+            if (a->index >= 0 && a->index < XZ_THEME_COUNT) {model.theme = a->index;xz_native_skin_request(a->index);}
             break;
         case XZ_UI_STEM_PAGE:
             if (a->index >= 0 && a->index < 4) model.stem_page = a->index;
@@ -197,6 +198,7 @@ static void apply(void *context, const struct xz_ui_action *actions, size_t coun
 }
 
 static void refresh(void) {
+    model.theme_status=xz_native_skin_status();
     __atomic_store_n(&inline_requested, requested_stems && model.stems_overlay && !touch.visible, __ATOMIC_RELEASE);
     __atomic_add_fetch(&xz_prepared_proof_v1.sequence,1,__ATOMIC_SEQ_CST);
     for (int deck = 0; deck < 2; deck++) {
@@ -420,10 +422,8 @@ __attribute__((visibility("default"))) int xz_mods_takeover_v1(void) {
 }
 
 static void badge(uint16_t *pixels, uint32_t stride) {
-    xz_ui_render_badge(pixels,stride);
-    xz_ui_render_stems_button(pixels,stride,model.stems_overlay);
-    if (model.connection.enabled && model.connection.connected)
-        xz_ui_render_vj_button(pixels, stride, model.fb_takeover);
+    xz_ui_render_native_buttons(pixels,stride,model.theme,model.stems_overlay,
+        model.connection.enabled&&model.connection.connected,model.fb_takeover);
 }
 
 void xz_ui_runtime_on_source_key(int source) {
@@ -539,11 +539,13 @@ int xz_ui_runtime_start(int audio_ready, int key_ready, int stems_enabled) {
     __atomic_store_n(&started, 1, __ATOMIC_RELEASE);
     if (xz_native_inline_start(inline_enabled,render_inline,NULL)) xz_log("Native inline stems unavailable: window ABI guard failed");
     if (xz_native_led_start()) xz_log("Native pad LED feedback unavailable");
+    if (xz_native_skin_start(model.theme)) xz_log("Native whole-interface theme adapter unavailable");
     xz_log("UI touch adapter installed; MODS badge opens the panel");
     return 0;
 }
 
 void xz_ui_runtime_stop(void) {
+    xz_native_skin_stop();
     xz_native_led_stop();
     __atomic_store_n(&started, 0, __ATOMIC_RELEASE);
     __atomic_store_n(&visible, 0, __ATOMIC_RELEASE);

@@ -46,7 +46,7 @@ The pure UI cannot execute any of these engine transitions itself.
 | SAMPLE_PAD / HOTCUE_PAD | slot 0..7 and PRESS/RELEASE |
 | STRIP | loop index 0..5, loop beats in `value`, pitch -12..12 in `secondary`; RELEASE ends gesture unless runtime HOLD is on |
 | HOLD / OVERDUB | requested 0/1; disabling overdub clears the event sequencer |
-| SET_THEME | theme index 0..6 |
+| SET_THEME | theme index 0..11 |
 | SERVER_AUTO | requested AUTO=1 / MANUAL=0 |
 | SERVER_ADDRESS | request the host's address editor; no keyboard is claimed here |
 | KEY_SHIFT / KEY_SYNC | signed semitone step / sync request; capability gated |
@@ -147,12 +147,40 @@ Each inline stem shows its volume percentage and accepts a horizontal drag.
 
 The original seven themes keep their saved IDs. Game Boy, Super Nintendo,
 Windows 95, Game Boy Color and Aqua / iTunes add original interface chrome;
-the two handheld themes also use an original pixel font. Themes affect MODS
-and the inline controls, not the complete stock firmware interface.
+the two handheld themes also use an original pixel font. The native skin
+adapter applies the selection to native artwork, drawing colors, both text
+paths, waveforms, markers and caution graphics as well as MODS. Physical
+screen-family coverage and audio acceptance remain separate release gates.
 
 Development deployments can use `--ram-settings` to read existing settings
 while keeping changes in RAM. This avoids writing a newer theme ID into the
 older USB runtime's preferences; reboot restores the original settings.
+
+## Native interface skin adapter
+
+`native_skin_runtime.c` builds immutable asset copies and RGB565 lookup tables
+on a background worker. A guarded callback on the native UI event loop
+publishes a completed theme and uses the firmware's normal repaint path.
+Original assets and native color caches remain untouched. Selecting Original
+regenerates the native windows from original data.
+
+The paired receiver styles the actual RGB16 window surfaces, including native
+surfaces that bypass the public CreateSurface wrapper. Per-window transparency
+keys are preserved for drawing, text, and bitmap sources; opaque colors cannot
+accidentally become transparent after mapping. The two native font paths keep
+their original metrics and use native fallback for unsupported glyphs.
+
+Fresh waveform buffers use bounded private copies. Partial marker updates use
+pristine backing with destruction tracking. Write-only caution rectangles use
+scratch buffers and merge only the pixels the native producer wrote. Album
+art and calibration patterns are excluded from blanket buffer processing.
+
+The portable suite verifies palettes, asset views, transparency and glyph
+bounds. `mods/tests/verify_native_surface.py` exercises the receiver functions
+themselves. Linux fixtures `test_native_skin_runtime.c`,
+`test_native_raw_skin.c` and `test_native_wave_skin.c` cover theme epochs,
+concurrent cache retirement, repeated redraws, retained pixels and ownership.
+None of these tests substitutes for native page and audio testing on the XZ.
 
 ## Enter and leave the VJ.Tools view
 

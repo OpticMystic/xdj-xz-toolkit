@@ -25,6 +25,7 @@ static int installed;
 static int observer;
 static int application_verified;
 static void *led_replacement;
+static void *skin_event_replacement;
 static int memory_fd = -1;
 static pthread_mutex_t cue_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct code_hook {
@@ -105,8 +106,9 @@ static int known_application(void) {
 }
 
 int xz_hook_slot(uint32_t address, uint32_t expected, void *replacement, void **original) {
-    if (!application_verified || address != 0x478d3c || expected != 0x27f074 ||
-        !replacement || !original || led_replacement) return -1;
+    void **owner = address==0x478d3c&&expected==0x27f074 ? &led_replacement :
+        address==0x3ea45c&&expected==0x18194c ? &skin_event_replacement : NULL;
+    if (!application_verified || !owner || !replacement || !original || *owner) return -1;
     int protection = range_protection(address,4);
     if (protection < 0 || !(protection & PROT_READ)) return -1;
     uint32_t *slot = (uint32_t *)(uintptr_t)address;
@@ -120,7 +122,7 @@ int xz_hook_slot(uint32_t address, uint32_t expected, void *replacement, void **
     if (mprotect((void *)page,(size_t)size,protection)) {
         *slot = expected; mprotect((void *)page,(size_t)size,protection); return -1;
     }
-    led_replacement = replacement;
+    *owner = replacement;
     return 0;
 }
 
@@ -137,6 +139,12 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
     static const unsigned char wave_unlock_guard[8] = {0x10,0x40,0x2d,0xe9,0x58,0xd0,0x4d,0xe2};
     static const unsigned char mixer_receive_guard[8] = {0x40,0x32,0xd0,0xe5,0xf0,0x47,0x2d,0xe9};
     static const unsigned char mixer_midi_cc_guard[8] = {0x80,0x00,0x13,0xe3,0xb0,0x10,0x81,0xe3};
+    static const unsigned char skin_image_guard[8] = {0xf0,0x4f,0x2d,0xe9,0x5c,0xd0,0x4d,0xe2};
+    static const unsigned char skin_wstring_guard[8] = {0x08,0xd0,0x4d,0xe2,0xba,0xc0,0xd0,0xe1};
+    static const unsigned char skin_glyph_guard[8] = {0x30,0x40,0x2d,0xe9,0x14,0xd0,0x4d,0xe2};
+    static const unsigned char skin_gamma_guard[8] = {0x02,0x20,0x42,0xe2,0x07,0x00,0x52,0xe3};
+    static const unsigned char skin_color_guard[8] = {0x10,0x40,0x2d,0xe9,0x02,0x00,0x51,0xe3};
+    static const unsigned char skin_option_guard[8] = {0x70,0x40,0x2d,0xe9,0x01,0x60,0xa0,0xe1};
     const unsigned char *guard = address == 0x8fd5c ? source_guard :
                                  address == 0x34ba0 ? load_guard :
                                  address == 0x348dc ? unload_guard :
@@ -148,6 +156,13 @@ int xz_hook_arm(uint32_t address, const unsigned char expected[8],
                                  address == 0x1656c4 ? wave_unlock_guard :
                                  address == 0x25d7f4 ? mixer_receive_guard :
                                  address == 0x2bde78 ? mixer_midi_cc_guard : NULL;
+    if(address==0x159ad4)guard=skin_image_guard;
+    if(address==0x15df68)guard=skin_wstring_guard;
+    if(address==0x207a70)guard=skin_glyph_guard;
+    if(address==0x1576a0)guard=wave_lock_guard;
+    if(address==0x157cc0)guard=skin_gamma_guard;
+    if(address==0x15cca8)guard=skin_color_guard;
+    if(address==0x15c92c)guard=skin_option_guard;
     if (!application_verified || !guard || !expected || !replacement || !original ||
         code_hook_count >= sizeof(code_hooks)/sizeof(code_hooks[0]) || memcmp(expected, guard, 8) != 0) return -1;
     int protection = range_protection(address, 8);

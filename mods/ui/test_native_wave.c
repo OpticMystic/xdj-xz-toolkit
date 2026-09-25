@@ -9,6 +9,7 @@
 #endif
 static uint16_t pixels[XZ_NATIVE_WAVE_PIXELS+8],scratch[XZ_NATIVE_WAVE_PIXELS+8];
 static int calls;
+static void tint(uint16_t *pixels,uint32_t count){for(uint32_t i=0;i<count;i++)pixels[i]^=0xffff;}
 static int draw(void *context,uint16_t *out,size_t count,size_t stride,int width,int height) {
     assert(count==536*XZ_WAVE_INLINE_HEIGHT&&stride==536&&width==536&&height==XZ_WAVE_INLINE_HEIGHT);calls++;
     for(size_t i=0;i<count;i++)out[i]=0xabcd;
@@ -63,5 +64,8 @@ int main(void) {
     assert(xz_native_wave_capture(&pair,&s,0x1fd058,7,pixels,1072));
     assert(!xz_native_wave_capture(&pair,&s,0,7,pixels,1072));
     assert(!pair.captured&&!pair.pixels);
+    fill();s=scene();assert(xz_native_wave_capture(&pair,&s,0x1fd058,7,pixels,1072));
+    assert(xz_native_wave_finish_styled(&pair,&s,7,200,scratch,XZ_NATIVE_WAVE_PIXELS,NULL,NULL,tint,0));
+    for(unsigned y=0;y<268;y++)for(unsigned x=0;x<536;x++)assert(pixels[y*536+x]==(uint16_t)(y^0xffff));
     puts("PASS native wave paired ownership, scene gates, transactional rendering, cue bands and bounds");
 }
