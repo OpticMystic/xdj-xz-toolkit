@@ -94,6 +94,8 @@ def cmd_build_usb(args):
             mods_mode="experimental" if mods_root else "observer",
         )
         if mods_root:
+            if (mods_root / "branding").is_dir():
+                shutil.copytree(mods_root / "branding", staging / "branding")
             shutil.copytree(mods_root / "licenses", staging / "licenses")
             print(f"  [+] XZ Mods menu runtime: {mods_manifest['files']['libxz-mods.so']}")
         if args.telnet:

@@ -236,8 +236,17 @@ stage_optional_assets() {
     fi
 
     if [ ! -f "$SOURCE_GUI" ]; then
-        log "No custom GUI pack in this payload."
-        return 0
+        if [ ! -f /mnt/iso/branding/apply.sh ]; then
+            log "No custom GUI pack in this payload."
+            return 0
+        fi
+        WAIT_COUNT=0
+        while [ ! -f "$GUI_TARGET" ] && [ "$WAIT_COUNT" -lt 45 ]; do
+            sleep 1
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+        done
+        [ -f "$GUI_TARGET" ] || return 1
+        SOURCE_GUI="$GUI_TARGET"
     fi
 
     GUI_SOURCE_MD5=$(file_md5 "$SOURCE_GUI")
@@ -274,6 +283,13 @@ stage_optional_assets() {
         fi
         GUI_RUNTIME_MD5=$(file_md5 "$GUI_RAM")
         log "GUI_IP_RUNTIME_PROOF: address=$DEVICE_IP md5=$GUI_RUNTIME_MD5"
+    fi
+
+    if [ -f /mnt/iso/branding/apply.sh ]; then
+        (cd /mnt/iso/branding && md5sum -c MD5SUMS) >>"$LOG" 2>&1 || return 1
+        sh /mnt/iso/branding/apply.sh "$GUI_RAM" >>"$LOG" 2>&1 || return 1
+        GUI_RUNTIME_MD5=$(file_md5 "$GUI_RAM")
+        log "XZ_MODS_BRANDING: applied original loading artwork in RAM."
     fi
 
     # On an early USB mount apl_start may still be mounting the UBIFS GUI

@@ -30,6 +30,7 @@ def main():
     # Stage only redistributable source and the two libraries. No firmware or keys.
     with tempfile.TemporaryDirectory(prefix="xz-mods-bundle-") as temporary:
         output = Path(temporary)
+        subprocess.run([sys.executable, str(source/'mods/ui/build_branding_assets.py'), str(source), str(output/'branding')],check=True)
         for original, name in (("libxz-mods-development.so", "libxz-mods.so"),
                                ("libxz-directfb-mods-test.so", "libxz-receiver.so")):
             shutil.copyfile(args.build_output / original, output / name)

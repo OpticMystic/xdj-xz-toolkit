@@ -61,6 +61,13 @@ def build_usb(volume,rbp,key,resources,job,experimental=False):
         staging=temporary/'payload'
         job.progress('build','Assembling the standalone mod and VJ.Tools connection')
         expected=firmware.stage_payload(staging,patched,runtime,receiver,resources/'bootstrap.sh')
+        branding=resources/'branding'
+        if branding.is_dir():
+            (staging/'branding').mkdir()
+            for name in ('apply.sh','MD5SUMS','splash.rgb565','logo.rgb565'):
+                data=(branding/name).read_bytes()
+                (staging/'branding'/name).write_bytes(data)
+                expected['branding/'+name]=data
         notices=staging/'licenses';notices.mkdir()
         for path in (resources/'licenses').iterdir():
             if path.is_file():shutil.copyfile(path,notices/path.name)
