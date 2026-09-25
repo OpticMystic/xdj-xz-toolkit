@@ -26,7 +26,7 @@ dd if="$assets/splash.rgb565" of="$pack" bs=8 seek=1541365 conv=notrunc 2>/dev/n
 dd if="$assets/logo.rgb565" of="$pack" bs=8 seek=1779173 conv=notrunc 2>/dev/null
 ''',encoding='ascii',newline='\n')
     names=['splash.rgb565','logo.rgb565','apply.sh']
-    (output/'MD5SUMS').write_text(''.join(hashlib.md5((output/n).read_bytes()).hexdigest()+'  '+n+'\n' for n in names),encoding='ascii')
+    (output/'MD5SUMS').write_text(''.join(hashlib.md5((output/n).read_bytes()).hexdigest()+'  '+n+'\n' for n in names),encoding='ascii',newline='\n')
 
 if __name__=='__main__':
     build(Path(sys.argv[1]).resolve(),Path(sys.argv[2]).resolve())
