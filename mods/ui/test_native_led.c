@@ -14,6 +14,11 @@ static int color(int deck,int pad,uint32_t *rgb,int *enabled) {
 }
 static void put(unsigned char *p,uint32_t v) {memcpy(p,&v,4);}
 static uint32_t word(const unsigned char *p) {uint32_t v;memcpy(&v,p,4);return v;}
+static int stem_color(int deck,int pad,uint32_t *rgb,int *enabled) {
+ assert(deck==0);
+ if(pad>=4)return 0;
+ *rgb=xz_stem_hardware_color(pad<3?2-pad:3);*enabled=1;return 1;
+}
 int main(void) {
  unsigned char packet[8*XZ_LED_RECORD_BYTES],saved[sizeof(packet)];
  memset(packet,0,sizeof(packet));
@@ -46,5 +51,14 @@ int main(void) {
  assert(!xz_native_led_apply(NULL,sizeof(packet),8,1,color));
  assert(!xz_native_led_apply(packet,sizeof(packet),8,1,NULL));
  assert(!memcmp(packet,saved,sizeof(packet)));
+ /* Firmware PadColorCode palette entries 21, 1, 42, 64 at 0x47b740.
+    Secondary channels must stay zero on the three colored physical pads. */
+ const unsigned char native_rgb[4][3]={{0,255,0},{0,0,255},{255,0,0},{255,255,255}};
+ packet[2*XZ_LED_RECORD_BYTES+0x18]=0;
+ assert(xz_native_led_apply(packet,sizeof(packet),8,1,stem_color)==4);
+ for(unsigned i=0;i<4;i++) {
+  assert(!memcmp(packet+i*XZ_LED_RECORD_BYTES+0x28,native_rgb[i],3));
+  assert(word(packet+i*XZ_LED_RECORD_BYTES+0x14)==0);
+ }
  puts("PASS native LED packet bounds, colors, mute, stock ownership and channel isolation");
 }
