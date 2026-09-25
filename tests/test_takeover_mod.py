@@ -44,7 +44,7 @@ class TakeoverModTests(unittest.TestCase):
         self.assertIn("takeover_assign=%d", settings_c)
         self.assertIn("s->fb_takeover <= 1", settings_c)
         self.assertIn("s->takeover_assign <= 2", settings_c)
-        self.assertIn("s.fb_takeover = 1", settings_c)
+        self.assertIn("s.fb_takeover = 0", settings_c)
         self.assertIn("s.takeover_assign = 0", settings_c)
 
     def test_ui_h_actions_and_model(self):
@@ -79,7 +79,8 @@ class TakeoverModTests(unittest.TestCase):
         self.assertIn("xz_hook_arm(0xe0a50, rekordbox_guard", ui_runtime_c)
         self.assertIn("XZ_UI_TAKEOVER_TOGGLE", ui_runtime_c)
         self.assertIn("XZ_UI_TAKEOVER_ASSIGN", ui_runtime_c)
-        self.assertIn("xz_ui_render_vj_button(pixels, stride, model.fb_takeover);", ui_runtime_c)
+        self.assertIn("xz_ui_render_native_buttons(pixels,stride,model.theme,model.stems_overlay,", ui_runtime_c)
+        self.assertIn("model.connection.enabled&&model.connection.connected,model.fb_takeover", ui_runtime_c)
 
     def test_directfb_hook_takeover_suppression(self):
         bridge_h = (VENDOR / "tools/xz_runtime/mods_bridge.h").read_text(encoding="utf-8")
