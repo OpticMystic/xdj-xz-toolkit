@@ -21,7 +21,7 @@ def status():
     manifest=json.loads(runtime.read_text()) if runtime.exists() else None
     catalog_path=Path(__file__).with_name('models.json')
     catalog=json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
-    return {'name':'XZ Mods','version':'0.1.2-preview','firmware':'XDJ-XZ 1.26',
+    return {'name':'XZ Mods','version':'0.1.4-preview','firmware':'XDJ-XZ 1.26',
         'prepared_formats':['overcue-stems/4','stemd-cache/1'],
         'separation_output_format':'stemd-cache/1',
         'release_ready':False,'runtime_present':manifest is not None,'runtime':manifest,

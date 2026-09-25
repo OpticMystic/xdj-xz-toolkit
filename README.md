@@ -1,7 +1,7 @@
 # xdj-xz-toolkit
 
 Public XDJ-XZ USB builder inputs and ARM display-hook sources for firmware
-1.26. Version 0.1.3 is a developer preview; final native-player and cold-boot qualification remains pending.
+1.26. Version 0.1.4 is a developer preview; final native-player and cold-boot qualification remains pending.
 
 ## What this is not
 
@@ -39,7 +39,7 @@ The September 24 source adds two 48-pixel stem rows, horizontal volume gestures,
 streamlined MODS navigation, native interface themes and corrected physical pad
 brightness across both banks. Split rows, clean playback and bright pads were
 confirmed in RAM trials, including the final primary pad colors. Theme coverage and
-cold-boot/two-deck qualification remain pending. The standalone 0.1.3 download
+cold-boot/two-deck qualification remain pending. The standalone 0.1.4 download
 includes this runtime and the automatic loading artwork. Rebuild older USB loaders to update them.
 
 See the [user guide and actual hardware screenshots](https://github.com/OpticMystic/XZ-Mods/blob/main/docs/USER-GUIDE.md)
